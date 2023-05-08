@@ -1,0 +1,28 @@
+SKIP=0
+# Options: merge, new
+# new: Creates a new directory containing the downloaded playlist
+# merge: Merges a new playlist download with already downloaded songs
+MODE=new
+
+# The url of the new playlist. The playlist must be public
+# URL=https://open.spotify.com/playlist/0AY5ZYG6u3qVkoqgcz2kv4
+URL=https://open.spotify.com/playlist/3Jcnqr8b6zZYYX41jAYaH8
+
+# Use Exportify to get csv files
+# The new songs to be added
+NEW=new.csv
+# The songs we are adding to. Leave blank for MODE=new
+OLD=songs.csv
+
+# The directory to put the songs in. For MODE=merge, this
+# is the directory that contains songs already
+DIR=./test
+
+# Manual song replacements
+# Comma separated list, where each entry is of the form
+# youtube_link | spotify_link
+REPLACE=[
+]
+
+# Leave blank for default
+# SKIP=
