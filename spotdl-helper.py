@@ -6,6 +6,7 @@ import os
 ### Default values ###
 
 ISSUES_URL = 'https://github.com/ArcWandx86/spotdl-helper/issues'
+CWD = os.getcwd()
 
 RULES = {
     'MODE': 'new',
@@ -30,7 +31,7 @@ TAKES_FILE = set(['NEW', 'OLD'])
 # Rule : set([ Modes to create if dir does not exist ])
 TAKES_DIR = {
     'DIR' : set(['new']),
-    'MANUAL-BUFFER' : set([]),
+    'MANUAL-BUFFER' : set(['merge', 'new']),
     'BUFFER' : set(['merge', 'new']),
 }
 
@@ -165,15 +166,43 @@ def array_check(rule, setting):
 ### Download songs ###
 
 # Helper function to call spotdl
-def spotdl(args):
+def spotdl(dir, *args):
+    os.chdir(CWD)
+    os.chdir(dir)
     subprocess.run(['spotdl', *args])
+    os.chdir(CWD)
 
 # Download songs into a buffer
 def download_songs(url, buffer):
-    os.chdir(buffer)
-    spotdl(['--output', RULES['OUTPUT-FORMAT']+'.{track-id}', url])
+    spotdl(buffer, '--output', RULES['OUTPUT-FORMAT']+'.{track-id}', url)
 
 ### \Download songs ###
+
+
+### Manual replace songs ###
+
+# Replaces songs based on a manually specified youtube url
+def replace_songs(replace_list):
+    spotify_track_url_prefix = 'https://open.spotify.com/track/'
+    # Split the list into spotify ids and the corresponding youtube urls
+    spotids = { s.split('|')[1].strip().replace(spotify_track_url_prefix, '')
+               .split('?')[0].strip() :
+               s.split('|')[0].strip() for s in replace_list }
+
+    # Download the replacements into a separate buffer
+    spotdl(RULES['MANUAL-BUFFER'], '--output', RULES['OUTPUT-FORMAT'],
+           *[ url + '|' + spotify_track_url_prefix + spotid for spotid, url in spotids.items() ])
+
+    # Delete the replaced songs from the main buffer
+    for file in os.listdir(RULES['BUFFER']):
+        if len(file.split('.')) < 2:
+            continue
+        if file.split('.')[-2] in spotids:
+            os.remove(os.path.join(RULES['BUFFER'], file))
+
+### Manual replace songs ###
+
+### \Manual replace songs ###
 
 
 ### Main ###
@@ -187,6 +216,7 @@ def main():
 
     funcs = [
         (download_songs, (RULES['URL'], RULES['BUFFER'])),
+        (replace_songs, (RULES['REPLACE'],)),
     ]
 
     list(map(lambda z: z[0](*z[1]), funcs[RULES['SKIP']:]))
