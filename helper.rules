@@ -13,10 +13,14 @@ URL=https://open.spotify.com/playlist/3Jcnqr8b6zZYYX41jAYaH8
 # is the directory that contains songs already
 DIR=./test
 
+# Whether or not to use mp3gain
+# MP3GAIN=True
+
 # Comma separated list of spotify urls where we should ignore
 # differences in the title and artist from the title and artist
 # of the youtube video.
 IGNORE-MISMATCH=[
+    https://open.spotify.com/track/51vRumtqbkNW9wrKfESwfu,
 ]
 
 # Manual song replacements
@@ -52,8 +56,9 @@ REPLACE=[
 # 3: Don't do verification
 # 4: Skip removing the spotify ids
 # 5: Don't check for duplicates
+# 6: Don't move to the main directory or remove buffers
 # 6: Do nothing
-# SKIP=2
+SKIP=5
 
 # The buffer used to store downloaded songs before moving into DIR
 # BUFFER=./tmp_dlbuf

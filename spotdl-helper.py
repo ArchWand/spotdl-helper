@@ -14,6 +14,7 @@ RULES = {
     'OUTPUT-FORMAT': '{title} - {artists}',
     'URL': '',
     'DIR': './songs',
+    'MP3GAIN': True,
     'IGNORE-MISMATCH': [],
     'REPLACE': [],
     'MANUAL-BUFFER': './tmp_manual',
@@ -29,6 +30,7 @@ SPOTIFY_TRACK_URL_PREFIX = 'https://open.spotify.com/track/'
 
 ## Rule types ##
 
+TAKES_BOOL = set(['MP3GAIN'])
 TAKES_INT = set(['DUP-SCAN-LEVEL', 'VERIFY-LEVEL', 'SKIP'])
 TAKES_FILE = set(['NEW', 'OLD'])
 
@@ -91,6 +93,12 @@ def parser(filename, rules):
             errors += file_check(rule, setting)
         elif rule in TAKES_DIR:
             errors += directory_check(rule, setting)
+        elif rule in TAKES_BOOL:
+            e = bool_check(rule, setting)
+            if e == '':
+                rules[rule] = str(setting).lower() in ['true', '1', 't', 'y', 'yes']
+            else:
+                errors += e
         elif rule in TAKES_INT:
             e = int_check(rule, setting)
             if e == '':
@@ -153,6 +161,11 @@ def directory_check(rule, setting):
         else:
             return f'Error: "{setting}" not found for {rule}.\n'
     return ''
+
+def bool_check(rule, setting):
+    if str(setting).lower() in ['true', '1', 't', 'y', 'yes', 'false', '0', 'f', 'n', 'no']:
+        return ''
+    return f'Error: {rule} must be a boolean.\n'
 
 def int_check(rule, setting):
     # Try to make the setting an int
@@ -342,9 +355,8 @@ def get_yt_data(fileurls):
     return metadata
 
 # Prompt the user to verify the songs
-def verification_prompt(queue, metadata, yt_metadata):
+def verification_prompt(queue, metadata, yt_metadata, ignore_mismatch):
     new_yt_urls = {}
-    ignore_mismatch = []
 
     print()
     print()
@@ -362,6 +374,10 @@ def verification_prompt(queue, metadata, yt_metadata):
         print(f'  Channel: {yt_metadata[file][2]}')
         print(f'  Album: {yt_metadata[file][3]}')
         print()
+
+        if file.split('.')[-2] in ignore_mismatch:
+            print('Ignoring mismatch.')
+            continue
 
         while True:
             response = input('Do these match? [y/n] ').lower()
@@ -390,9 +406,11 @@ def verification_prompt(queue, metadata, yt_metadata):
     return new_yt_urls, ignore_mismatch
 
 # Verify that the correct songs were downloaded
-def verify(level):
+def verify(level, ignore_mismatch):
     if level == 0:
         return
+
+    ignore_mismatch = [s.replace(SPOTIFY_TRACK_URL_PREFIX, '') for s in ignore_mismatch]
 
     # { filename: (title, artist, album, url)}
     metadata = get_ffprobe_data()
@@ -415,7 +433,7 @@ def verify(level):
         return
 
     # { spotify_id: youtube_url }
-    new_yt_urls, ignore_mismatch = verification_prompt(verification_queue, metadata, yt_metadata)
+    new_yt_urls, ignore_mismatch = verification_prompt(verification_queue, metadata, yt_metadata, ignore_mismatch)
     if len(new_yt_urls) == 0 and len(ignore_mismatch) == 0:
         return
 
@@ -444,6 +462,42 @@ def verify(level):
 ### \Verification ###
 
 
+### Combine and clean ###
+
+# Combine the directories and remove the buffers
+def combine_and_clean(dir, buffer, manual_buffer):
+    os.chdir(CWD)
+
+    # Move everything to dir
+    for file in os.listdir(buffer):
+        os.rename(f'{buffer}/{file}', f'{dir}/{file}')
+    for file in os.listdir(manual_buffer):
+        os.rename(f'{manual_buffer}/{file}', f'{dir}/{file}')
+
+    # Remove the buffers
+    os.rmdir(buffer)
+    os.rmdir(manual_buffer)
+
+    os.chdir(CWD)
+
+### \Combine and clean ###
+
+
+### MP3GAIN ###
+
+# Apply mp3gain
+def mp3gain(yes, dir):
+    if not yes:
+        return
+
+    os.chdir(CWD)
+    os.chdir(dir)
+    subprocess.run(['mp3gain', '-r', '.'])
+    os.chdir(CWD)
+
+### \MP3GAIN ###
+
+
 ### Main ###
 
 def main():
@@ -457,9 +511,11 @@ def main():
     funcs = [
         (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
         (manual_relace_songs, [ RULES['REPLACE'] ]),
-        (verify, [ RULES['VERIFY-LEVEL'] ]),
-        #  (remove_ids, [ RULES['BUFFER'] ]),
-        #  (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
+        (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
+        (remove_ids, [ RULES['BUFFER'] ]),
+        (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
+        (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'] ]),
+        (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
     ]
 
     # Executes the functions in func
