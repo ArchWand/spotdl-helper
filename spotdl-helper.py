@@ -1,5 +1,5 @@
-from spotdl.console import console_entry_point
-import pandas as pd
+#  import pandas as pd
+import subprocess
 import sys
 import os
 
@@ -9,12 +9,13 @@ ISSUES_URL = 'https://github.com/ArcWandx86/spotdl-helper/issues'
 
 RULES = {
     'MODE': 'new',
+    'OUTPUT-FORMAT': '{title} - {artists}',
     'URL': '',
-    'NEW': '',
-    'OLD': '',
     'DIR': './songs',
-    'OUTPUT-FORMAT': '{title} - {artists}.{track-id}',
     'REPLACE': [],
+    'MANUAL-BUFFER': './tmp_manual',
+    'DUP-SCAN-LEVEL': 3,
+    'VERIFY-LEVEL': 1,
 
     # Skip options to resume an interrupted download
     'SKIP': 0,
@@ -23,13 +24,14 @@ RULES = {
 
 ## Rule types ##
 
-TAKES_INT = set(['SKIP'])
+TAKES_INT = set(['DUP-SCAN-LEVEL', 'VERIFY-LEVEL', 'SKIP'])
 TAKES_FILE = set(['NEW', 'OLD'])
 
-# Rule : [ Modes to create if dir does not exist ]
+# Rule : set([ Modes to create if dir does not exist ])
 TAKES_DIR = {
-    'DIR' : ['new'],
-    'BUFFER' : ['new', 'merge'],
+    'DIR' : set(['new']),
+    'MANUAL-BUFFER' : set([]),
+    'BUFFER' : set(['merge', 'new']),
 }
 
 # Rule : set([options])
@@ -44,47 +46,6 @@ TAKES_ARRAY = {
 }
 
 ### \Default values ###
-
-
-### Main ###
-
-def main():
-    filename = 'helper.rules'
-    if len(sys.argv) > 1:
-        filename = sys.argv[1]
-
-    funcs = [
-        (parser, (filename, RULES)),
-        (download_songs, (RULES['URL'], RULES['BUFFER'])),
-    ]
-
-    list(map(lambda z: z[0](*z[1]), funcs[RULES['SKIP']:]))
-
-
-# Helper function to call spotdl
-def spotdl(args):
-    sys.argv = ['spotdl', *args]
-    try:
-        print("Trying to call spotdl with: ", sys.argv)
-        exit(44)
-        console_entry_point()
-    except Exception as e:
-        print("EXCEPTION RAISED")
-        print(e)
-        exit(42)
-
-
-### \Main ###
-
-
-### Download songs ###
-
-# Download songs into a buffer
-def download_songs(url, buffer):
-    os.chdir(buffer)
-    spotdl(['--output', RULES['OUTPUT-FORMAT'], url])
-
-### \Download songs ###
 
 
 ### Parsing ###
@@ -199,6 +160,38 @@ def array_check(rule, setting):
     return ''
 
 ### \Parsing ###
+
+
+### Download songs ###
+
+# Helper function to call spotdl
+def spotdl(args):
+    subprocess.run(['spotdl', *args])
+
+# Download songs into a buffer
+def download_songs(url, buffer):
+    os.chdir(buffer)
+    spotdl(['--output', RULES['OUTPUT-FORMAT']+'.{track-id}', url])
+
+### \Download songs ###
+
+
+### Main ###
+
+def main():
+    filename = 'helper.rules'
+    if len(sys.argv) > 1:
+        filename = sys.argv[1]
+
+    parser(filename, RULES)
+
+    funcs = [
+        (download_songs, (RULES['URL'], RULES['BUFFER'])),
+    ]
+
+    list(map(lambda z: z[0](*z[1]), funcs[RULES['SKIP']:]))
+
+### \Main ###
 
 
 if __name__ == '__main__':
