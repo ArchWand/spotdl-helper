@@ -492,7 +492,7 @@ def mp3gain(yes, dir):
 
     os.chdir(CWD)
     os.chdir(dir)
-    subprocess.run(['mp3gain', '-r', '.'])
+    subprocess.run('mp3gain -r *', shell=True)
     os.chdir(CWD)
 
 ### \MP3GAIN ###
