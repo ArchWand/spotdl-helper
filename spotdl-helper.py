@@ -56,6 +56,33 @@ TAKES_ARRAY = {
 ### \Default values ###
 
 
+### Main ###
+
+def main():
+    filename = 'helper.rules'
+    if len(sys.argv) > 1:
+        filename = sys.argv[1]
+
+    parser(filename, RULES)
+
+    # [ (func, [ params ]), ]
+    funcs = [
+        (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
+        (manual_relace_songs, [ RULES['REPLACE'] ]),
+        (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
+        (remove_ids, [ RULES['BUFFER'] ]),
+        (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
+        (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'] ]),
+        (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
+    ]
+
+    # Executes the functions in func
+    # Done this way to implement SKIP
+    list(map(lambda z: z[0](*z[1]), funcs[RULES['SKIP']:]))
+
+### \Main ###
+
+
 ### Helper ###
 
 # Helper function to call spotdl
@@ -66,6 +93,7 @@ def spotdl(dir, *args):
     os.chdir(CWD)
 
 ### \Helper ###
+
 
 ### Parsing ###
 
@@ -205,19 +233,6 @@ def download_songs(url, buffer):
 
 ### Manual replace songs ###
 
-# Replace songs by their spotify id with a given youtube url
-def replace_songs(spotids):
-    # Download the replacements into a separate buffer
-    for spotid, url in spotids.items():
-        spotdl(RULES['MANUAL-BUFFER'], '--output', RULES['OUTPUT-FORMAT'],
-               url + '|' + SPOTIFY_TRACK_URL_PREFIX + spotid)
-        # Delete the replaced song from the main buffer
-        for file in os.listdir(RULES['BUFFER']):
-            if len(file.split('.')) < 3:
-                continue
-            if file.split('.')[-2] == spotid:
-                os.remove(os.path.join(RULES['BUFFER'], file))
-
 # Replaces songs based on the configuration array
 def manual_relace_songs(replace_list):
     # Clear the buffer
@@ -231,63 +246,77 @@ def manual_relace_songs(replace_list):
 
     replace_songs(spotids)
 
+# Replace songs by their spotify id with a given youtube url
+def replace_songs(spotids):
+    # Download the replacements into a separate buffer
+    for spotid, url in spotids.items():
+        spotdl(RULES['MANUAL-BUFFER'], '--output', RULES['OUTPUT-FORMAT'],
+               url + '|' + SPOTIFY_TRACK_URL_PREFIX + spotid)
+        # Delete the replaced song from the main buffer
+        for file in os.listdir(RULES['BUFFER']):
+            if len(file.split('.')) < 3:
+                continue
+            if file.split('.')[-2] == spotid:
+                os.remove(os.path.join(RULES['BUFFER'], file))
+
 ### \Manual replace songs ###
 
 
-### Remove IDs ###
+### Verification ###
 
-# Remove IDs from the files in the buffer
-def remove_ids(buffer):
-    for file in os.listdir(buffer):
-        if len(file.split('.')) < 3:
-            continue
-        os.rename(os.path.join(buffer, file),
-                  os.path.join(buffer, '.'.join(file.split('.')[:-2]) + '.' + file.split('.')[-1]))
-
-### \Remove IDs ###
-
-
-### Duplicate check ###
-
-# Check for duplicates
-def duplicate_check(level):
-    if level == 0 or RULES['MODE'] != 'merge':
+# Verify that the correct songs were downloaded
+def verify(level, ignore_mismatch):
+    if level == 0:
         return
 
-    # Get the list of songs in the buffer
-    buffer_songs = os.listdir(RULES['BUFFER'])
-    # Get the list of songs in the output directory
-    output_songs = set(os.listdir(RULES['OUTPUT']))
+    ignore_mismatch = [s.replace(SPOTIFY_TRACK_URL_PREFIX, '') for s in ignore_mismatch]
 
-    # Get the list of songs that are in both the buffer and the output
-    duplicates = [s for s in buffer_songs if s in output_songs]
+    # { filename: (title, artist, album, url)}
+    metadata = get_ffprobe_data()
+    # { filename: (title, creator, channel, album)}
+    yt_metadata = get_yt_data({ file: data[3] for file, data in metadata.items() })
 
-    match level:
-        case 1: # Delete the duplicates from the buffer
-            for file in duplicates:
-                os.remove(os.path.join(RULES['BUFFER'], file))
-        case 2: # Delete the duplicates from the existing directory
-            for file in duplicates:
-                os.remove(os.path.join(RULES['OUTPUT'], file))
-        case 3: # Manual review
-            if len(duplicates) == 0:
-                return
+    # Make sure that title and artist match
+    verification_queue = []
+    for file, (title, artist, album, _), _, (yt_title, creator, channel, yt_album) in zip(
+        metadata.keys(), metadata.values(), yt_metadata.keys(), yt_metadata.values()):
+        if title != yt_title:
+            verification_queue.append(file)
+        if artist != creator and artist != channel:
+            verification_queue.append(file)
+        if level == 2 or level == 4 and album != yt_album:
+            verification_queue.append(file)
 
-            with open('duplicates.txt', 'w') as f:
-                f.write('\n'.join(duplicates))
-            print(f'{len(duplicates)} duplicates found.\n')
-            if len(duplicates) < 15:
-                print('Duplicates:')
-                print('\n'.join(duplicates))
+    # Prompt the user to verify the songs
+    if len(verification_queue) == 0:
+        return
 
-            print('Duplicates written to duplicates.txt')
-            print('Please remove the duplicates and run again.')
-            exit(4)
+    # { spotify_id: youtube_url }
+    new_yt_urls, ignore_mismatch = verification_prompt(verification_queue, metadata, yt_metadata, ignore_mismatch)
+    if len(new_yt_urls) == 0 and len(ignore_mismatch) == 0:
+        return
 
-### \Duplicate check ###
+    # Give opportunity to copy the array
+    print()
+    print('=' * 80)
+    print()
+    print('You may want to copy the following array(s) to helper.rules')
+    # Ignore mismatch
+    if len(ignore_mismatch) > 0:
+        print('IGNORE-MISMATCH=[') # ] to fix syntax highlighting
+        for spotify_id in ignore_mismatch:
+            print(f'    {SPOTIFY_TRACK_URL_PREFIX}{spotify_id},')
+        print(']')
 
+    # Replace
+    if len(new_yt_urls) > 0:
+        print('REPLACE=[') # ] to fix syntax highlighting
+        for spotify_id, youtube_url in new_yt_urls.items():
+            print(f'    {youtube_url} | {SPOTIFY_TRACK_URL_PREFIX}{spotify_id},')
+        print(']')
+    input('Press enter to continue...')
 
-### Verification ###
+    replace_songs(new_yt_urls)
 
 # Get the metadata of the songs in the buffer using ffprobe
 def get_ffprobe_data():
@@ -403,61 +432,60 @@ def verification_prompt(queue, metadata, yt_metadata, ignore_mismatch):
 
     return new_yt_urls, ignore_mismatch
 
-# Verify that the correct songs were downloaded
-def verify(level, ignore_mismatch):
-    if level == 0:
-        return
-
-    ignore_mismatch = [s.replace(SPOTIFY_TRACK_URL_PREFIX, '') for s in ignore_mismatch]
-
-    # { filename: (title, artist, album, url)}
-    metadata = get_ffprobe_data()
-    # { filename: (title, creator, channel, album)}
-    yt_metadata = get_yt_data({ file: data[3] for file, data in metadata.items() })
-
-    # Make sure that title and artist match
-    verification_queue = []
-    for file, (title, artist, album, _), _, (yt_title, creator, channel, yt_album) in zip(
-        metadata.keys(), metadata.values(), yt_metadata.keys(), yt_metadata.values()):
-        if title != yt_title:
-            verification_queue.append(file)
-        if artist != creator and artist != channel:
-            verification_queue.append(file)
-        if level == 2 or level == 4 and album != yt_album:
-            verification_queue.append(file)
-
-    # Prompt the user to verify the songs
-    if len(verification_queue) == 0:
-        return
-
-    # { spotify_id: youtube_url }
-    new_yt_urls, ignore_mismatch = verification_prompt(verification_queue, metadata, yt_metadata, ignore_mismatch)
-    if len(new_yt_urls) == 0 and len(ignore_mismatch) == 0:
-        return
-
-    # Give opportunity to copy the array
-    print()
-    print('=' * 80)
-    print()
-    print('You may want to copy the following array(s) to helper.rules')
-    # Ignore mismatch
-    if len(ignore_mismatch) > 0:
-        print('IGNORE-MISMATCH=[') # ] to fix syntax highlighting
-        for spotify_id in ignore_mismatch:
-            print(f'    {SPOTIFY_TRACK_URL_PREFIX}{spotify_id},')
-        print(']')
-
-    # Replace
-    if len(new_yt_urls) > 0:
-        print('REPLACE=[') # ] to fix syntax highlighting
-        for spotify_id, youtube_url in new_yt_urls.items():
-            print(f'    {youtube_url} | {SPOTIFY_TRACK_URL_PREFIX}{spotify_id},')
-        print(']')
-    input('Press enter to continue...')
-
-    replace_songs(new_yt_urls)
-
 ### \Verification ###
+
+
+### Remove IDs ###
+
+# Remove IDs from the files in the buffer
+def remove_ids(buffer):
+    for file in os.listdir(buffer):
+        if len(file.split('.')) < 3:
+            continue
+        os.rename(os.path.join(buffer, file),
+                  os.path.join(buffer, '.'.join(file.split('.')[:-2]) + '.' + file.split('.')[-1]))
+
+### \Remove IDs ###
+
+
+### Duplicate check ###
+
+# Check for duplicates
+def duplicate_check(level):
+    if level == 0 or RULES['MODE'] != 'merge':
+        return
+
+    # Get the list of songs in the buffer
+    buffer_songs = os.listdir(RULES['BUFFER'])
+    # Get the list of songs in the output directory
+    output_songs = set(os.listdir(RULES['OUTPUT']))
+
+    # Get the list of songs that are in both the buffer and the output
+    duplicates = [s for s in buffer_songs if s in output_songs]
+
+    match level:
+        case 1: # Delete the duplicates from the buffer
+            for file in duplicates:
+                os.remove(os.path.join(RULES['BUFFER'], file))
+        case 2: # Delete the duplicates from the existing directory
+            for file in duplicates:
+                os.remove(os.path.join(RULES['OUTPUT'], file))
+        case 3: # Manual review
+            if len(duplicates) == 0:
+                return
+
+            with open('duplicates.txt', 'w') as f:
+                f.write('\n'.join(duplicates))
+            print(f'{len(duplicates)} duplicates found.\n')
+            if len(duplicates) < 15:
+                print('Duplicates:')
+                print('\n'.join(duplicates))
+
+            print('Duplicates written to duplicates.txt')
+            print('Please remove the duplicates and run again.')
+            exit(4)
+
+### \Duplicate check ###
 
 
 ### Combine and clean ###
@@ -494,33 +522,6 @@ def mp3gain(yes, dir):
     os.chdir(CWD)
 
 ### \MP3GAIN ###
-
-
-### Main ###
-
-def main():
-    filename = 'helper.rules'
-    if len(sys.argv) > 1:
-        filename = sys.argv[1]
-
-    parser(filename, RULES)
-
-    # [ (func, [ params ]), ]
-    funcs = [
-        (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
-        (manual_relace_songs, [ RULES['REPLACE'] ]),
-        (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
-        (remove_ids, [ RULES['BUFFER'] ]),
-        (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
-        (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'] ]),
-        (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
-    ]
-
-    # Executes the functions in func
-    # Done this way to implement SKIP
-    list(map(lambda z: z[0](*z[1]), funcs[RULES['SKIP']:]))
-
-### \Main ###
 
 
 if __name__ == '__main__':
