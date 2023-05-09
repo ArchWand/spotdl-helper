@@ -27,19 +27,27 @@ REPLACE=[
 # 0: Don't check for duplicates. May result in overwriting
 # 1: Don't overwrite duplicates.
 # 2: Overwrite duplicates with newer file.
-# 3: (default) Queue duplicates for manual review.
+# 3: (default) Queue duplicates for manual handling.
 # DUP-SCAN-LEVEL=3
 
 # Determines how strict verification is. Files that fail verification
 # will be queued for manual review.
 # 0: Don't do any verification
 # 1: (default) Make sure title and artist match.
-# 2: Make sure title and artist match. Automatically fails if not from youtube music.
+# 2: Make sure title, artist, and album match.
+# 3: Make sure title and artist match. Automatically fails if not from youtube music.
+# 4: Make sure title, artist, and album match. Automatically fails if not from youtube music.
 # VERIFY-LEVEL=1
 
-# Integer value describing which steps to skip
+# Integer value describing what steps to skip
+# Each value also skips all actions prior.
 # 0: Run normally
 # 1: Don't download again (may want to set BUFFER)
+# 2: Don't do manual replacing
+# 3: Skip removing the spotify ids
+# 4: Don't check for duplicates
+# 5: Don't do verification
+# 6: Do nothing
 SKIP=0
 
 # The buffer used to store downloaded songs before moving into DIR
