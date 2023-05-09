@@ -1,18 +1,14 @@
-SKIP=0
 # Options: merge, new
 # new: Creates a new directory containing the downloaded playlist
 # merge: Merges a new playlist download with already downloaded songs
 MODE=new
 
+# Format for the file names; syntax is that of spotdl (`spotdl -h | grep -A 10 -- --output`)
+# OUTPUT-FORMAT={title} - {artists}
+
 # The url of the new playlist. The playlist must be public
 # URL=https://open.spotify.com/playlist/0AY5ZYG6u3qVkoqgcz2kv4
 URL=https://open.spotify.com/playlist/3Jcnqr8b6zZYYX41jAYaH8
-
-# Use Exportify to get csv files
-# The new songs to be added
-NEW=new.csv
-# The songs we are adding to. Leave blank for MODE=new
-OLD=songs.csv
 
 # The directory to put the songs in. For MODE=merge, this
 # is the directory that contains songs already
@@ -22,7 +18,30 @@ DIR=./test
 # Comma separated list, where each entry is of the form
 # youtube_link | spotify_link
 REPLACE=[
+	https://youtu.be/2Vv-BfVoq4g | https://open.spotify.com/track/0tgVpDi06FyKpA1z0VMD4v?si=34261020d28f46e3
 ]
+# Buffer for manual songs
+# MANUAL-BUFFER=./tmp_manual
 
-# Leave blank for default
-# SKIP=
+# Determines how strictly duplicates are checked for when merging
+# 0: Don't check for duplicates. May result in overwriting
+# 1: Don't overwrite duplicates.
+# 2: Overwrite duplicates with newer file.
+# 3: (default) Queue duplicates for manual review.
+# DUP-SCAN-LEVEL=3
+
+# Determines how strict verification is. Files that fail verification
+# will be queued for manual review.
+# 0: Don't do any verification
+# 1: (default) Make sure title and artist match.
+# 2: Make sure title and artist match. Automatically fails if not from youtube music.
+# VERIFY-LEVEL=1
+
+# Integer value describing which steps to skip
+# 0: Run normally
+# 1: Don't download again (may want to set BUFFER)
+SKIP=0
+
+# The buffer used to store downloaded songs before moving into DIR
+# BUFFER=./tmp_dlbuf
+
