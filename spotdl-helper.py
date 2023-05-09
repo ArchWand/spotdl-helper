@@ -19,7 +19,7 @@ RULES = {
     'REPLACE': [],
     'MANUAL-BUFFER': './tmp_manual',
     'DUP-SCAN-LEVEL': 3,
-    'VERIFY-LEVEL': 1,
+    'VERIFY-LEVEL': 6,
 
     # Skip options to resume an interrupted download
     'SKIP': 0,
@@ -72,6 +72,7 @@ def main():
         (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
         (remove_ids, [ RULES['BUFFER'] ]),
         (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
+        (rename_non_ascii, [ RULES['BUFFER'], RULES['MANUAL-BUFFER'] ]),
         (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'] ]),
         (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
     ]
@@ -278,13 +279,8 @@ def verify(level, ignore_mismatch):
 
     # Make sure that title and artist match
     verification_queue = []
-    for file, (title, artist, album, _), _, (yt_title, creator, channel, yt_album) in zip(
-        metadata.keys(), metadata.values(), yt_metadata.keys(), yt_metadata.values()):
-        if title != yt_title:
-            verification_queue.append(file)
-        if artist != creator and artist != channel:
-            verification_queue.append(file)
-        if level == 2 or level == 4 and album != yt_album:
+    for file, data, _, yt_data in zip(metadata.keys(), metadata.values(), yt_metadata.keys(), yt_metadata.values()):
+        if queue_for_verification(level, file, data, yt_data, ignore_mismatch):
             verification_queue.append(file)
 
     # Prompt the user to verify the songs
@@ -355,7 +351,10 @@ def get_yt_data(fileurls):
     metadata = {}
 
     with YoutubeDL() as ydl:
+        i = 1
         for filename, url in fileurls.items():
+            print(f'Extracting metadata for ({i}/{len(fileurls)})')
+            i += 1
             data = json.loads(json.dumps(ydl.sanitize_info(
                 ydl.extract_info(url, download=False))))
 
@@ -381,6 +380,31 @@ def get_yt_data(fileurls):
 
     return metadata
 
+# Check if the file should be queued for verification
+def queue_for_verification(level, file, metadata, yt_metadata, ignore_mismatch):
+    if file.split('.')[-2] in ignore_mismatch:
+        return False
+
+    title, artist, album, url = metadata
+    yt_title, yt_creator, yt_channel, yt_album = yt_metadata
+
+    match level:
+        case 1:
+            return title != yt_title or (artist != yt_creator and artist != yt_channel)
+        case 2:
+            return title != yt_title or (artist != yt_creator and artist != yt_channel) or album != yt_album
+        case 3:
+            return title != yt_title or (artist != yt_creator and artist != yt_channel) and not url.startswith('https://music.youtube.com/')
+        case 4:
+            return title != yt_title or (artist != yt_creator and artist != yt_channel) or album != yt_album or not url.startswith('https://music.youtube.com/')
+        case 5:
+            return title != yt_title or (artist != yt_creator and artist != yt_channel and album != yt_album)
+        case 6:
+            return (title != yt_title and f'{title} ({title})' != yt_title) or (artist != yt_creator and artist != yt_channel and album != yt_album)
+        case _:
+            print(f'Invalid verification level: {level}')
+            exit(4)
+
 # Prompt the user to verify the songs
 def verification_prompt(queue, metadata, yt_metadata, ignore_mismatch):
     new_yt_urls = {}
@@ -389,17 +413,19 @@ def verification_prompt(queue, metadata, yt_metadata, ignore_mismatch):
     print()
     print(f'{len(queue)} song(s) may need verification.')
     for file in queue:
+        title, artist, album, url = metadata[file]
+        yt_title, yt_creator, yt_channel, yt_album = yt_metadata[file]
         print()
-        print(f'{file}: {metadata[file][3]}')
+        print(f'{file}: {url}')
         print('Spotify: ')
-        print(f'  Title: {metadata[file][0]}')
-        print(f'  Artist: {metadata[file][1]}')
-        print(f'  Album: {metadata[file][2]}')
+        print(f'  Title: {title}')
+        print(f'  Artist: {artist}')
+        print(f'  Album: {album}')
         print('YouTube: ')
-        print(f'  Title: {yt_metadata[file][0]}')
-        print(f'  Creator: {yt_metadata[file][1]}')
-        print(f'  Channel: {yt_metadata[file][2]}')
-        print(f'  Album: {yt_metadata[file][3]}')
+        print(f'  Title: {yt_title}')
+        print(f'  Creator: {yt_creator}')
+        print(f'  Channel: {yt_channel}')
+        print(f'  Album: {yt_album}')
         print()
 
         if file.split('.')[-2] in ignore_mismatch:
@@ -417,7 +443,7 @@ def verification_prompt(queue, metadata, yt_metadata, ignore_mismatch):
             elif response == 'n':
                 while True:
                     url = input('Enter a correct URL: ')
-                    if url.startswith('https://') and 'youtube' in url:
+                    if url.startswith('https://') and 'youtu' in url:
                         if len(file.split('.')) < 3:
                             print(f'File {file} is improperly formatted.')
                             exit(6)
@@ -488,6 +514,56 @@ def duplicate_check(level):
 ### \Duplicate check ###
 
 
+### Rename non-ASCII ###
+
+# Rename files with non-ASCII characters to be more easily searchable
+def rename_non_ascii(buffer, manual_buffer):
+    rename_buffer = [ file for file in os.listdir(buffer) if any(ord(char) > 127 for char in file) ]
+    rename_manual_buffer = [ file for file in os.listdir(manual_buffer) if any(ord(char) > 127 for char in file) ]
+    
+    for file in rename_buffer:
+        name = rename_prompt(file)
+        os.rename(os.path.join(buffer, file), os.path.join(buffer, name))
+    for file in rename_manual_buffer:
+        name = rename_prompt(file)
+        os.rename(os.path.join(manual_buffer, file), os.path.join(manual_buffer, name))
+
+# Prompt to get the new name
+def rename_prompt(file):
+    print()
+    print(f'Non-ASCII characters found in {file}.')
+    print('1. Ignore')
+    print('2. Change only the title')
+    print('3. Rename but keep file extension')
+    print('4. Rename and change file extension')
+    i = 0
+    while True:
+        i = input('Choose an option: ')
+        try:
+            i = int(i)
+        except ValueError:
+            print('Please enter a valid option.')
+            continue
+        if i >= 1 and i <= 4:
+            break
+        else:
+            print('Please enter a valid option.')
+
+    match i:
+        case 1:
+            return file
+        case 2:
+            return str(input('Enter a new title: ')) + ' - ' + file.split(' - ')[-1]
+        case 3:
+            return str(input('Enter a new name: ')) + '.' + file.split('.')[-1]
+        case 4:
+            return str(input('Enter a new name: '))
+        case _:
+            return file
+
+### \Rename non-ASCII ###
+
+
 ### Combine and clean ###
 
 # Combine the directories and remove the buffers
@@ -501,8 +577,10 @@ def combine_and_clean(dir, buffer, manual_buffer):
         os.rename(f'{manual_buffer}/{file}', f'{dir}/{file}')
 
     # Remove the buffers
-    os.rmdir(buffer)
-    os.rmdir(manual_buffer)
+    if dir != buffer:
+        os.rmdir(buffer)
+    if dir != manual_buffer:
+        os.rmdir(manual_buffer)
 
     os.chdir(CWD)
 

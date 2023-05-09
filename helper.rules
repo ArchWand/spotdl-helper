@@ -7,11 +7,11 @@ MODE=new
 # OUTPUT-FORMAT={title} - {artists}
 
 # The url of the new playlist. The playlist must be public
-URL=
+URL=https://open.spotify.com/playlist/0M7Js61sNncAzxDMG6htFU
 
 # The directory to put the songs in. For MODE=merge, this
 # is the directory that contains songs already
-DIR=./test
+DIR=./new
 
 # Whether or not to use mp3gain
 # MP3GAIN=True
@@ -20,12 +20,53 @@ DIR=./test
 # differences in the title and artist from the title and artist
 # of the youtube video.
 IGNORE-MISMATCH=[
+    https://open.spotify.com/track/1BArNw5s6pzhaoqrPM8ccF,
+    https://open.spotify.com/track/0br4r9VlPdofrWXxPorlYd,
+    https://open.spotify.com/track/05ib88vsMeLfwlAfrZyz99,
+    https://open.spotify.com/track/6r0k7OqcR7qn730YndgjU9,
+    https://open.spotify.com/track/7IqYkjcFnqKPmwg6lWxXYv,
+    https://open.spotify.com/track/5iIpbD34k4wnuRMZDNnuWf,
+    https://open.spotify.com/track/0GUbhhI5fRx7BlqlqlhjuB,
+    https://open.spotify.com/track/31bblGq3GvqLutoW9wTcZy,
+    https://open.spotify.com/track/7eBpUuPnDTfbeP1P4P93CS,
+    https://open.spotify.com/track/4EF941VzqGMLFnYlXH03hG,
+    https://open.spotify.com/track/15djITIu5osnO9yIT29r0Z,
+    https://open.spotify.com/track/36DcCSKGShF6p3h2JMcPDg,
+    https://open.spotify.com/track/69CrOS7vEHIrhC2ILyEi0s,
+    https://open.spotify.com/track/3HHFOztnhfIWxjOr2s06sw,
+    https://open.spotify.com/track/5QzjOeD7eXFZpVVyVC7ls2,
+    https://open.spotify.com/track/0qr3qIT7OrhzT33sW1syLI,
+    https://open.spotify.com/track/5cKkGvsvzhIiTGhsZWZjby,
+    https://open.spotify.com/track/59WDxA3UxKvJDIJcK6dVZv,
+    https://open.spotify.com/track/0ULq4YEtDWHBOJTeoOR2jt,
+    https://open.spotify.com/track/4qQ3e0YD83kblcnb8R0sIw,
+    https://open.spotify.com/track/4uUG5RXrOk84mYEfFvj3cK,
+    https://open.spotify.com/track/7od91jr6uXk0JoxVaIRA18,
+    https://open.spotify.com/track/3UXbXCrnZKWfQ0oIJpFSVs,
+    https://open.spotify.com/track/0rTXn4ovXalJGkJMx5hsnX,
+    https://open.spotify.com/track/6t0U6KWwrQzl3HcyusKvLS,
+    https://open.spotify.com/track/6rMV3HFJWJIC1qF8JNOw2S,
+    https://open.spotify.com/track/0rNLaGUleZ91DXMxmZNq5v,
+    https://open.spotify.com/track/1VjIS4qoyD6JS2rNZQgE00,
+    https://open.spotify.com/track/7FbrGaHYVDmfr7KoLIZnQ7,
+    https://open.spotify.com/track/3AOf6YEpxQ894FmrwI9k96,
+    https://open.spotify.com/track/1AToLLvWghQgiBFef1iGuR,
+    https://open.spotify.com/track/41tvdK0UNp3oNKWDPkg7FO,
+    https://open.spotify.com/track/4ghTyKLeMMTZQ85LwRbej0,
+    https://open.spotify.com/track/5pzfgUsBcsenLNQaiaOGp7,
+    https://open.spotify.com/track/2bZIDMpzVooosmPHn0tHnd,
+    https://open.spotify.com/track/6v5RXtxK1HWGtUEU7EQG58,
+    https://open.spotify.com/track/5HrIcZOo1DysX53qDRlRnt,
 ]
 
 # Manual song replacements
 # Comma separated list, where each entry is of the form
 # youtube_link | spotify_link
 REPLACE=[
+    https://www.youtube.com/watch?v=i0RCcSBPjuU | https://open.spotify.com/track/0GkxvVZdAe7XdMLtShHE6M,
+    https://www.youtube.com/watch?v=CC7OrEx5H4U | https://open.spotify.com/track/3AX57OUAxdFR1RbkI3R5WN,
+    https://www.youtube.com/watch?v=eOOsAeOx5a0 | https://open.spotify.com/track/2TwB7aK39tnZBQjBPgcbCj,
+    https://www.youtube.com/watch?v=YGMriz__78c | https://open.spotify.com/track/1dmi9lVthTKjuemmO8ucWm,
 ]
 # Buffer for manual songs
 # MANUAL-BUFFER=./tmp_manual
@@ -40,22 +81,25 @@ REPLACE=[
 # Determines how strict verification is. Files that fail verification
 # will be queued for manual review.
 # 0: Don't do any verification
-# 1: (default) Make sure title and artist match.
-# 2: Make sure title, artist, and album match.
-# 3: Make sure title and artist match. Automatically fails if not from youtube music.
-# 4: Make sure title, artist, and album match. Automatically fails if not from youtube music.
-# VERIFY-LEVEL=1
+# 1: Make sure title and artist match.
+# 2: #1, along with making album match.
+# 3: #1. Automatically fails if not from youtube music.
+# 4: #2. Automatically fails if not from youtube music.
+# 5: Title and either artist or album must match.
+# 6: (default) #5, but youtube title can also follow the pattern "title (title)"
+# VERIFY-LEVEL=6
 
 # Integer value describing what steps to skip
 # Each value also skips all actions prior.
 # 0: Run normally
-# 1: Don't download again (may want to set BUFFER)
-# 2: Don't do manual replacing
-# 3: Don't do verification
-# 4: Skip removing the spotify ids
-# 5: Don't check for duplicates
-# 6: Don't move to the main directory or remove buffers
-# 6: Do nothing
+# 1: Skip downloading to manual replacing
+# 2: Skip over manual replacing to verification
+# 3: Skip over verification to removing ids
+# 4: Skip removing the spotify ids to checking for duplicates
+# 5: Skip checking for duplicates to renaming non-ascii files
+# 6: Skip renaming non-ascii files to combining and removing buffers
+# 7: Skip combining and removing buffers to normalizing with mp3gain
+# 8: Do nothing
 # SKIP=0
 
 # The buffer used to store downloaded songs before moving into DIR
