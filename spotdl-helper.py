@@ -14,6 +14,7 @@ RULES = {
     'OUTPUT-FORMAT': '{title} - {artists}',
     'URL': '',
     'DIR': './songs',
+    'IGNORE-MISMATCH': [],
     'REPLACE': [],
     'MANUAL-BUFFER': './tmp_manual',
     'DUP-SCAN-LEVEL': 3,
@@ -23,6 +24,8 @@ RULES = {
     'SKIP': 0,
     'BUFFER': './tmp_dlbuf',
 }
+
+SPOTIFY_TRACK_URL_PREFIX = 'https://open.spotify.com/track/'
 
 ## Rule types ##
 
@@ -44,11 +47,25 @@ TAKES_STR = {
 
 # Rule : (checking function, error descriptor)
 TAKES_ARRAY = {
+    'IGNORE-MISMATCH': (lambda s: SPOTIFY_TRACK_URL_PREFIX in s, "must Spotify url"),
     'REPLACE': (lambda s: '|' in s, "must contain '|'"),
 }
 
 ### \Default values ###
 
+
+### Helper ###
+
+# Helper function to call spotdl
+def spotdl(dir, *args):
+    print('Called with:')
+    print('\n'.join(args))
+    os.chdir(CWD)
+    os.chdir(dir)
+    subprocess.run(['spotdl', *args])
+    os.chdir(CWD)
+
+### \Helper ###
 
 ### Parsing ###
 
@@ -166,15 +183,10 @@ def array_check(rule, setting):
 
 ### Download songs ###
 
-# Helper function to call spotdl
-def spotdl(dir, *args):
-    os.chdir(CWD)
-    os.chdir(dir)
-    subprocess.run(['spotdl', *args])
-    os.chdir(CWD)
-
 # Download songs into a buffer
 def download_songs(url, buffer):
+    for file in os.listdir(buffer):
+        os.remove(os.path.join(buffer, file))
     spotdl(buffer, '--output', RULES['OUTPUT-FORMAT']+'.{track-id}', url)
 
 ### \Download songs ###
@@ -182,24 +194,31 @@ def download_songs(url, buffer):
 
 ### Manual replace songs ###
 
-# Replaces songs based on a manually specified youtube url
-def replace_songs(replace_list):
-    spotify_track_url_prefix = 'https://open.spotify.com/track/'
+# Replace songs by their spotify id with a given youtube url
+def replace_songs(spotids):
+    # Download the replacements into a separate buffer
+    for spotid, url in spotids.items():
+        spotdl(RULES['MANUAL-BUFFER'], '--output', RULES['OUTPUT-FORMAT'],
+               url + '|' + SPOTIFY_TRACK_URL_PREFIX + spotid)
+        # Delete the replaced song from the main buffer
+        for file in os.listdir(RULES['BUFFER']):
+            if len(file.split('.')) < 3:
+                continue
+            if file.split('.')[-2] == spotid:
+                os.remove(os.path.join(RULES['BUFFER'], file))
+
+# Replaces songs based on the configuration array
+def manual_relace_songs(replace_list):
+    # Clear the buffer
+    for file in os.listdir(RULES['MANUAL-BUFFER']):
+        os.remove(os.path.join(RULES['MANUAL-BUFFER'], file))
+
     # Split the list into spotify ids and the corresponding youtube urls
-    spotids = { s.split('|')[1].strip().replace(spotify_track_url_prefix, '')
+    spotids = { s.split('|')[1].strip().replace(SPOTIFY_TRACK_URL_PREFIX, '')
                .split('?')[0].strip() :
                s.split('|')[0].strip() for s in replace_list }
 
-    # Download the replacements into a separate buffer
-    spotdl(RULES['MANUAL-BUFFER'], '--output', RULES['OUTPUT-FORMAT'],
-           *[ url + '|' + spotify_track_url_prefix + spotid for spotid, url in spotids.items() ])
-
-    # Delete the replaced songs from the main buffer
-    for file in os.listdir(RULES['BUFFER']):
-        if len(file.split('.')) < 3:
-            continue
-        if file.split('.')[-2] in spotids:
-            os.remove(os.path.join(RULES['BUFFER'], file))
+    replace_songs(spotids)
 
 ### \Manual replace songs ###
 
@@ -212,7 +231,7 @@ def remove_ids(buffer):
         if len(file.split('.')) < 3:
             continue
         os.rename(os.path.join(buffer, file),
-                  os.path.join(buffer, '.'.join(file.split('.')[:-1]) + '.' + file.split('.')[-1]))
+                  os.path.join(buffer, '.'.join(file.split('.')[:-2]) + '.' + file.split('.')[-1]))
 
 ### \Remove IDs ###
 
@@ -322,6 +341,54 @@ def get_yt_data(fileurls):
 
     return metadata
 
+# Prompt the user to verify the songs
+def verification_prompt(queue, metadata, yt_metadata):
+    new_yt_urls = {}
+    ignore_mismatch = []
+
+    print()
+    print()
+    print(f'{len(queue)} song(s) may need verification.')
+    for file in queue:
+        print()
+        print(f'{file}: {metadata[file][3]}')
+        print('Spotify: ')
+        print(f'  Title: {metadata[file][0]}')
+        print(f'  Artist: {metadata[file][1]}')
+        print(f'  Album: {metadata[file][2]}')
+        print('YouTube: ')
+        print(f'  Title: {yt_metadata[file][0]}')
+        print(f'  Creator: {yt_metadata[file][1]}')
+        print(f'  Channel: {yt_metadata[file][2]}')
+        print(f'  Album: {yt_metadata[file][3]}')
+        print()
+
+        while True:
+            response = input('Do these match? [y/n] ').lower()
+            if response == 'y':
+                if len(file.split('.')) < 3:
+                    print(f'File {file} is improperly formatted.')
+                    exit(6)
+                ignore_mismatch.append(file.split('.')[-2])
+                break
+            elif response == 'n':
+                while True:
+                    url = input('Enter a correct URL: ')
+                    if url.startswith('https://') and 'youtube' in url:
+                        if len(file.split('.')) < 3:
+                            print(f'File {file} is improperly formatted.')
+                            exit(6)
+                        new_yt_urls[file.split('.')[-2]] = url
+                        break
+                    else:
+                        print('Please enter a valid YouTube URL.')
+                break
+            else:
+                print('Please enter y or n.')
+        print()
+
+    return new_yt_urls, ignore_mismatch
+
 # Verify that the correct songs were downloaded
 def verify(level):
     if level == 0:
@@ -343,12 +410,36 @@ def verify(level):
         if level == 2 or level == 4 and album != yt_album:
             verification_queue.append(file)
 
-    print('Metadata: ')
-    print(metadata)
-    print('Youtube metadata: ')
-    print(yt_metadata)
-    print('Verification queue: ')
-    print(verification_queue)
+    # Prompt the user to verify the songs
+    if len(verification_queue) == 0:
+        return
+
+    # { spotify_id: youtube_url }
+    new_yt_urls, ignore_mismatch = verification_prompt(verification_queue, metadata, yt_metadata)
+    if len(new_yt_urls) == 0 and len(ignore_mismatch) == 0:
+        return
+
+    # Give opportunity to copy the array
+    print()
+    print('=' * 80)
+    print()
+    print('You may want to copy the following array(s) to helper.rules')
+    # Ignore mismatch
+    if len(ignore_mismatch) > 0:
+        print('IGNORE-MISMATCH=[') # ] to fix syntax highlighting
+        for spotify_id in ignore_mismatch:
+            print(f'    {SPOTIFY_TRACK_URL_PREFIX}{spotify_id},')
+        print(']')
+
+    # Replace
+    if len(new_yt_urls) > 0:
+        print('REPLACE=[') # ] to fix syntax highlighting
+        for spotify_id, youtube_url in new_yt_urls.items():
+            print(f'    {youtube_url} | {SPOTIFY_TRACK_URL_PREFIX}{spotify_id},')
+        print(']')
+    input('Press enter to continue...')
+
+    replace_songs(new_yt_urls)
 
 ### \Verification ###
 
@@ -362,14 +453,17 @@ def main():
 
     parser(filename, RULES)
 
+    # [ (func, [ params ]), ]
     funcs = [
         (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
-        (replace_songs, [ RULES['REPLACE'] ]),
-        (remove_ids, [ RULES['BUFFER'] ]),
-        (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
+        (manual_relace_songs, [ RULES['REPLACE'] ]),
         (verify, [ RULES['VERIFY-LEVEL'] ]),
+        #  (remove_ids, [ RULES['BUFFER'] ]),
+        #  (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
     ]
 
+    # Executes the functions in func
+    # Done this way to implement SKIP
     list(map(lambda z: z[0](*z[1]), funcs[RULES['SKIP']:]))
 
 ### \Main ###
