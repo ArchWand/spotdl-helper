@@ -60,8 +60,6 @@ TAKES_ARRAY = {
 
 # Helper function to call spotdl
 def spotdl(dir, *args):
-    print('Called with:')
-    print('\n'.join(args))
     os.chdir(CWD)
     os.chdir(dir)
     subprocess.run(['spotdl', *args])
