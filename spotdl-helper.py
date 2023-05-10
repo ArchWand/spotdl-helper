@@ -484,7 +484,7 @@ def duplicate_check(level):
     # Get the list of songs in the buffer
     buffer_songs = os.listdir(RULES['BUFFER'])
     # Get the list of songs in the output directory
-    output_songs = set(os.listdir(RULES['OUTPUT']))
+    output_songs = set(os.listdir(RULES['DIR']))
 
     # Get the list of songs that are in both the buffer and the output
     duplicates = [s for s in buffer_songs if s in output_songs]
@@ -495,7 +495,7 @@ def duplicate_check(level):
                 os.remove(os.path.join(RULES['BUFFER'], file))
         case 2: # Delete the duplicates from the existing directory
             for file in duplicates:
-                os.remove(os.path.join(RULES['OUTPUT'], file))
+                os.remove(os.path.join(RULES['DIR'], file))
         case 3: # Manual review
             if len(duplicates) == 0:
                 return
