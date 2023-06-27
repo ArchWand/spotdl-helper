@@ -17,13 +17,13 @@ RULES = {
     'MP3GAIN': True,
     'IGNORE-MISMATCH': [],
     'REPLACE': [],
-    'MANUAL-BUFFER': './tmp_manual',
+    'MANUAL-BUFFER': './.tmp_manual',
     'DUP-SCAN-LEVEL': 3,
     'VERIFY-LEVEL': 6,
 
     # Skip options to resume an interrupted download
     'SKIP': 0,
-    'BUFFER': './tmp_dlbuf',
+    'BUFFER': './.tmp_dlbuf',
 }
 
 SPOTIFY_TRACK_URL_PREFIX = 'https://open.spotify.com/track/'
@@ -49,7 +49,7 @@ TAKES_STR = {
 
 # Rule : (checking function, error descriptor)
 TAKES_ARRAY = {
-    'IGNORE-MISMATCH': (lambda s: SPOTIFY_TRACK_URL_PREFIX in s, "must Spotify url"),
+    'IGNORE-MISMATCH': (lambda s: SPOTIFY_TRACK_URL_PREFIX in s, "must be Spotify url"),
     'REPLACE': (lambda s: '|' in s, "must contain '|'"),
 }
 

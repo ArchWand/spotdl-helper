@@ -28,7 +28,13 @@ IGNORE-MISMATCH=[
 REPLACE=[
 ]
 # Buffer for manual songs
-# MANUAL-BUFFER=./tmp_manual
+# MANUAL-BUFFER=./.tmp_manual
+
+# File renames
+# Comman separated list, where each entry is of the form
+# old_name : new_name
+RENAME=[
+]
 
 # Determines how strictly duplicates are checked for when merging
 # 0: Don't check for duplicates. May result in overwriting
@@ -62,5 +68,5 @@ REPLACE=[
 # SKIP=0
 
 # The buffer used to store downloaded songs before moving into DIR
-# BUFFER=./tmp_dlbuf
+# BUFFER=./.tmp_dlbuf
 
