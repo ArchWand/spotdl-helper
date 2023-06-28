@@ -59,7 +59,7 @@ RENAME=[
 # 1: Skip over missing url
 # 2: Allow manual skipping of missing url
 # 3: (default) Ask for user input on missing url
-VERIFY-IGNORE-MISSING-URL=2
+# VERIFY-IGNORE-MISSING-URL=3
 
 # Integer value describing what steps to skip
 # Each value also skips all actions prior.
