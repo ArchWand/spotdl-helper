@@ -17,9 +17,11 @@ RULES = {
     'MP3GAIN': True,
     'IGNORE-MISMATCH': [],
     'REPLACE': [],
+    'RENAME': [],
     'MANUAL-BUFFER': './.tmp_manual',
     'DUP-SCAN-LEVEL': 3,
     'VERIFY-LEVEL': 6,
+    'VERIFY-IGNORE-MISSING-URL': 3,
 
     # Skip options to resume an interrupted download
     'SKIP': 0,
@@ -31,10 +33,10 @@ SPOTIFY_TRACK_URL_PREFIX = 'https://open.spotify.com/track/'
 ## Rule types ##
 
 TAKES_BOOL = set(['MP3GAIN'])
-TAKES_INT = set(['DUP-SCAN-LEVEL', 'VERIFY-LEVEL', 'SKIP'])
+TAKES_INT = set(['DUP-SCAN-LEVEL', 'VERIFY-LEVEL', 'VERIFY-IGNORE-MISSING-URL', 'SKIP'])
 TAKES_FILE = set(['NEW', 'OLD'])
 
-# Rule : set([ Modes to create if dir does not exist ])
+# Rule : set([ Mode to create and ensure empty ])
 TAKES_DIR = {
     'DIR' : set(['new']),
     'MANUAL-BUFFER' : set(['merge', 'new']),
@@ -51,6 +53,7 @@ TAKES_STR = {
 TAKES_ARRAY = {
     'IGNORE-MISMATCH': (lambda s: SPOTIFY_TRACK_URL_PREFIX in s, "must be Spotify url"),
     'REPLACE': (lambda s: '|' in s, "must contain '|'"),
+    'RENAME': (lambda s: ':' in s, "must contain ':'"),
 }
 
 ### \Default values ###
@@ -72,7 +75,7 @@ def main():
         (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
         (remove_ids, [ RULES['BUFFER'] ]),
         (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
-        (rename_non_ascii, [ RULES['BUFFER'], RULES['MANUAL-BUFFER'] ]),
+        (rename, [ RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['RENAME'] ]),
         (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'] ]),
         (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
     ]
@@ -90,7 +93,11 @@ def main():
 def spotdl(dir, *args):
     os.chdir(CWD)
     os.chdir(dir)
-    subprocess.run(['spotdl', *args])
+    try:
+        subprocess.run(['spotdl', *args])
+    except FileNotFoundError:
+        print('Error: spotdl not found. Is spotdl installed?')
+        exit(1)
     os.chdir(CWD)
 
 ### \Helper ###
@@ -187,6 +194,9 @@ def directory_check(rule, setting):
             os.makedirs(setting)
         else:
             return f'Error: "{setting}" not found for {rule}.\n'
+    # Make sure the directory is empty
+    if len(os.listdir(setting)) > 0:
+        return f'Error: "{setting}" is not empty.\n'
     return ''
 
 def bool_check(rule, setting):
@@ -225,8 +235,9 @@ def array_check(rule, setting):
 
 # Download songs into a buffer
 def download_songs(url, buffer):
-    for file in os.listdir(buffer):
-        os.remove(os.path.join(buffer, file))
+    if len(os.listdir(buffer)) > 0:
+        print(f'Error: {buffer} is not empty.')
+        exit(1)
     spotdl(buffer, '--output', RULES['OUTPUT-FORMAT']+'.{track-id}', url)
 
 ### \Download songs ###
@@ -236,9 +247,10 @@ def download_songs(url, buffer):
 
 # Replaces songs based on the configuration array
 def manual_relace_songs(replace_list):
-    # Clear the buffer
-    for file in os.listdir(RULES['MANUAL-BUFFER']):
-        os.remove(os.path.join(RULES['MANUAL-BUFFER'], file))
+    # Check that the buffer is clear
+    if len(os.listdir(RULES['MANUAL-BUFFER'])) > 0:
+        print(f'Error: {RULES["MANUAL-BUFFER"]} is not empty.')
+        exit(1)
 
     # Split the list into spotify ids and the corresponding youtube urls
     spotids = { s.split('|')[1].strip().replace(SPOTIFY_TRACK_URL_PREFIX, '')
@@ -353,6 +365,31 @@ def get_yt_data(fileurls):
     with YoutubeDL() as ydl:
         i = 1
         for filename, url in fileurls.items():
+            if url == '':
+                match RULES['VERIFY-IGNORE-MISSING-URL']:
+                    case 0: # Error on missing url
+                        print(f'Error: {filename} has no url data.')
+                        print('Consider copying the output of spotdl to a text file for viewing.')
+                        exit(1)
+                    case 1: # Skip over missing url
+                        continue
+                    case 2: # Allow manual skipping of missing url
+                        print(f'Error: {filename} has no url data.')
+                        print('Please enter a url for the song.')
+                        url = input('Url: ')
+                        if url == '':
+                            print('WARNING: No url entered. Skipping song.')
+                            continue
+                    case 3: # (default) Ask for user input on missing url
+                        print(f'Error: {filename} has no url.')
+                        print('Please enter a url for the song.')
+                        url = input('Url: ')
+                        if url == '':
+                            print('Error: No url entered.')
+                            exit(1)
+                    case _:
+                        print(f'Error: Invalid value for VERIFY-IGNORE-MISSING-URL: {RULES["VERIFY-IGNORE-MISSING-URL"]}')
+
             print(f'Extracting metadata for ({i}/{len(fileurls)})')
             i += 1
             data = json.loads(json.dumps(ydl.sanitize_info(
@@ -514,19 +551,59 @@ def duplicate_check(level):
 ### \Duplicate check ###
 
 
-### Rename non-ASCII ###
+### Rename ###
+
+def rename(buffer, manual_buffer, rename_list):
+    # Split rename_list into rename_map
+    rename_map = { name.split(':')[0].strip(): name.split(':')[1].strip() for name in rename_list }
+
+    # { old_name : new_name }
+    new_renames = rename_non_ascii(buffer, manual_buffer, rename_map)
+
+    # Automatic rename remaining
+    for file in os.listdir(buffer):
+        if file in rename_map:
+            os.rename(os.path.join(buffer, file), os.path.join(buffer, rename_map[file]))
+    for file in os.listdir(manual_buffer):
+        if file in rename_map:
+            os.rename(os.path.join(manual_buffer, file), os.path.join(manual_buffer, rename_map[file]))
+
+    # Give opportunity to copy the rename list
+    if len(new_renames) > 0:
+        print()
+        print('=' * 80)
+        print()
+        print('You may want to copy the following array to helper.rules')
+        print('RENAME=[') # ] to fix syntax highlighting
+        for old_name, new_name in new_renames.items():
+            print(f'    {old_name} : {new_name},')
+        print(']')
+        input('Press enter to continue...')
 
 # Rename files with non-ASCII characters to be more easily searchable
-def rename_non_ascii(buffer, manual_buffer):
+def rename_non_ascii(buffer, manual_buffer, rename_map):
     rename_buffer = [ file for file in os.listdir(buffer) if any(ord(char) > 127 for char in file) ]
     rename_manual_buffer = [ file for file in os.listdir(manual_buffer) if any(ord(char) > 127 for char in file) ]
+    new_renames = {}
     
     for file in rename_buffer:
-        name = rename_prompt(file)
+        name = ''
+        if file in rename_map:
+            name = rename_map[file]
+        else:
+            name = rename_prompt(file)
+            new_renames[file] = name
         os.rename(os.path.join(buffer, file), os.path.join(buffer, name))
     for file in rename_manual_buffer:
-        name = rename_prompt(file)
+        name = ''
+        if file in rename_map:
+            name = rename_map[file]
+        else:
+            name = rename_prompt(file)
+            new_renames[file] = name
         os.rename(os.path.join(manual_buffer, file), os.path.join(manual_buffer, name))
+
+    return new_renames
 
 # Prompt to get the new name
 def rename_prompt(file):
@@ -561,7 +638,7 @@ def rename_prompt(file):
         case _:
             return file
 
-### \Rename non-ASCII ###
+### \Rename ###
 
 
 ### Combine and clean ###
