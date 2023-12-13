@@ -96,6 +96,38 @@ def main():
 
 ### Helper ###
 
+# Wrapper function for creating directories
+def mkdir(dir):
+    print(f'filesystem: mkdir {dir}')
+    if not os.path.isdir(dir):
+        os.makedirs(dir)
+    else:
+        print(f'FileWarning: {dir} already exists. No change')
+
+# Wrapper function for removing directories
+def rmdir(dir):
+    print(f'filesystem: rmdir {dir}')
+    if os.path.isdir(dir):
+        os.rmdir(dir)
+    else:
+        print(f'FileWarning: {dir} does not exist. No change')
+
+# Wrapper function for removing files
+def rm(file):
+    print(f'filesystem: rm {file}')
+    if os.path.isfile(file):
+        os.remove(file)
+    else:
+        print(f'FileWarning: {file} does not exist. No change')
+
+# Wrapper function for renaming or moving files
+def mv(old, new):
+    print(f'filesystem: mv {old} {new}')
+    if os.path.isfile(old):
+        os.rename(old, new)
+    else:
+        print(f'FileWarning: {old} does not exist. No change')
+
 # Helper function to call spotdl
 def spotdl(dir, *args):
     os.chdir(CWD)
@@ -274,8 +306,7 @@ def directory_check(rule, setting):
         return f'Error: {rule} must be a directory name.\n'
     if not os.path.isdir(setting):
         # Make the directory if it doesn't exist
-        os.makedirs(setting)
-        print(f'Making directory: {setting}')
+        mkdir(setting)
     # Make sure the directory is empty
     if len(os.listdir(setting)) > 0:
         # If skip is non-zero, prompt to proceed
@@ -359,7 +390,7 @@ def replace_songs(spotids):
             if len(file.split('.')) < 3:
                 continue
             if file.split('.')[-2] == spotid:
-                os.remove(os.path.join(RULES['BUFFER'], file))
+                rm(os.path.join(RULES['BUFFER'], file))
 
 ### \Manual replace songs ###
 
@@ -575,8 +606,8 @@ def remove_ids(buffer):
     for file in os.listdir(buffer):
         if len(file.split('.')) < 3:
             continue
-        os.rename(os.path.join(buffer, file),
-                  os.path.join(buffer, '.'.join(file.split('.')[:-2]) + '.' + file.split('.')[-1]))
+        mv(os.path.join(buffer, file),
+           os.path.join(buffer, '.'.join(file.split('.')[:-2]) + '.' + file.split('.')[-1]))
 
 ### \Remove IDs ###
 
@@ -593,10 +624,10 @@ def rename(buffer, manual_buffer, rename_list):
     # Automatic rename remaining
     for file in os.listdir(buffer):
         if file in rename_map:
-            os.rename(os.path.join(buffer, file), os.path.join(buffer, rename_map[file]))
+            mv(os.path.join(buffer, file), os.path.join(buffer, rename_map[file]))
     for file in os.listdir(manual_buffer):
         if file in rename_map:
-            os.rename(os.path.join(manual_buffer, file), os.path.join(manual_buffer, rename_map[file]))
+            mv(os.path.join(manual_buffer, file), os.path.join(manual_buffer, rename_map[file]))
 
     # Give opportunity to copy the rename list
     if len(new_renames) > 0:
@@ -623,7 +654,7 @@ def rename_non_ascii(buffer, manual_buffer, rename_map):
         else:
             name = rename_prompt(file)
             new_renames[file] = name
-        os.rename(os.path.join(buffer, file), os.path.join(buffer, name))
+        mv(os.path.join(buffer, file), os.path.join(buffer, name))
     for file in rename_manual_buffer:
         name = ''
         if file in rename_map:
@@ -631,7 +662,7 @@ def rename_non_ascii(buffer, manual_buffer, rename_map):
         else:
             name = rename_prompt(file)
             new_renames[file] = name
-        os.rename(os.path.join(manual_buffer, file), os.path.join(manual_buffer, name))
+        mv(os.path.join(manual_buffer, file), os.path.join(manual_buffer, name))
 
     return new_renames
 
@@ -679,22 +710,22 @@ def combine_and_clean(dir, buffer, manual_buffer, json_buffer):
 
     # Move everything to dir
     for file in os.listdir(buffer):
-        os.rename(f'{buffer}/{file}', f'{dir}/{file}')
+        mv(f'{buffer}/{file}', f'{dir}/{file}')
     for file in os.listdir(manual_buffer):
-        os.rename(f'{manual_buffer}/{file}', f'{dir}/{file}')
+        mv(f'{manual_buffer}/{file}', f'{dir}/{file}')
 
     # Remove the buffers
     if dir != buffer:
-        os.rmdir(buffer)
+        rmdir(buffer)
     if dir != manual_buffer:
-        os.rmdir(manual_buffer)
+        rmdir(manual_buffer)
 
     # Remove all json metadata
     for file in os.listdir(json_buffer):
         if file.endswith('.json'):
-            os.remove(f'{json_buffer}/{file}')
+            rm(f'{json_buffer}/{file}')
     if dir != json_buffer:
-        os.rmdir(json_buffer)
+        rmdir(json_buffer)
 
     os.chdir(CWD)
 
