@@ -44,6 +44,7 @@ TAKES_DIR = set(['DIR', 'MANUAL-BUFFER', 'BUFFER', 'JSON-BUFFER'])
 # Rule : set([options])
 TAKES_STR = {
     'MODE': set(['diff', 'new']),
+    'DIFF-MODE': set(['new', 'old', 'diff', 'common']),
     'SKIP_TO': '',
 }
 
@@ -116,39 +117,38 @@ def diff(mode, new, old):
     old_ids = set(old['Spotify ID'])
 
     # Find the diff
-    match mode:
-        case 'new':
-            diff = new_ids - old_ids
-        case 'old':
-            diff = old_ids - new_ids
-        case 'diff':
-            diff = new_ids ^ old_ids
-        case 'common':
-            diff = new_ids & old_ids
-        case _:
-            print(f'Invalid diff mode: {mode}')
-            exit(3)
+    if mode == 'new':
+        diff = new_ids - old_ids
+    elif mode == 'old':
+        diff = old_ids - new_ids
+    elif mode == 'diff':
+        diff = new_ids ^ old_ids
+    elif mode == 'common':
+        diff = new_ids & old_ids
+    else:
+        print(f'Invalid diff mode: {mode}')
+        exit(3)
 
     print('Spotify ID,Title,Artist,Album,URL')
     for id in diff:
         if mode == 'new':
-            row = new[new['Spotify ID'] == id]
+            row = new.loc[new['Spotify ID'] == id]
         elif mode == 'old':
-            row = old[old['Spotify ID'] == id]
+            row = old.loc[old['Spotify ID'] == id]
         elif mode == 'diff':
-            row = new[new['Spotify ID'] == id]
+            row = new.loc[new['Spotify ID'] == id]
             if len(row) == 0:
-                row = old[old['Spotify ID'] == id]
+                row = old.loc[old['Spotify ID'] == id]
         elif mode == 'common':
-            row = new[new['Spotify ID'] == id]
+            row = new.loc[new['Spotify ID'] == id]
             if len(row) == 0:
-                row = old[old['Spotify ID'] == id]
+                row = old.loc[old['Spotify ID'] == id]
         else:
             print(f'Invalid diff mode: {mode}')
             exit(3)
 
         row = row.iloc[0]
-        print(f'{row["Spotify ID"]},{row["Title"]},{row["Artist"]},{row["Album"]},{row["URL"]}')
+        print(f'{row["Spotify ID"]}, {row["Track Name"]}, {row["Artist Name(s)"]}, {row["Album Name"]}')
 
 ### \Diff ###
 
