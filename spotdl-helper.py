@@ -117,35 +117,31 @@ def diff(mode, new, old):
     old_ids = set(old['Spotify ID'])
 
     # Find the diff
-    if mode == 'new':
-        diff = new_ids - old_ids
-    elif mode == 'old':
-        diff = old_ids - new_ids
-    elif mode == 'diff':
-        diff = new_ids ^ old_ids
-    elif mode == 'common':
-        diff = new_ids & old_ids
-    else:
-        print(f'Invalid diff mode: {mode}')
-        exit(3)
+    match mode:
+        case 'new': diff = new_ids - old_ids
+        case 'old': diff = old_ids - new_ids
+        case 'diff': diff = new_ids ^ old_ids
+        case 'common': diff = new_ids & old_ids
+        case _:
+            print(f'Invalid diff mode: {mode}')
+            exit(3)
 
     print('Spotify ID,Title,Artist,Album,URL')
     for id in diff:
-        if mode == 'new':
-            row = new.loc[new['Spotify ID'] == id]
-        elif mode == 'old':
-            row = old.loc[old['Spotify ID'] == id]
-        elif mode == 'diff':
-            row = new.loc[new['Spotify ID'] == id]
-            if len(row) == 0:
-                row = old.loc[old['Spotify ID'] == id]
-        elif mode == 'common':
-            row = new.loc[new['Spotify ID'] == id]
-            if len(row) == 0:
-                row = old.loc[old['Spotify ID'] == id]
-        else:
-            print(f'Invalid diff mode: {mode}')
-            exit(3)
+        new_row = new.loc[new['Spotify ID'] == id]
+        old_row = old.loc[old['Spotify ID'] == id]
+        match mode:
+            case 'new': row = new_row
+            case 'old': row = old_row
+            case 'diff': row = new_row if len(new_row) > 0 else old_row
+            case 'common':
+                if not new_row.equals(old_row):
+                    print(f'Error: {id} has different data in new and old.')
+                    exit(2)
+                row = new_row
+            case _:
+                print(f'Invalid diff mode: {mode}')
+                exit(3)
 
         row = row.iloc[0]
         print(f'{row["Spotify ID"]}, {row["Track Name"]}, {row["Artist Name(s)"]}, {row["Album Name"]}')
