@@ -82,7 +82,6 @@ def main():
         (download_metadata, [ RULES['JSON-BUFFER'] ]),
         (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
         (remove_ids, [ RULES['BUFFER'] ]),
-        (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
         (rename, [ RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['RENAME'] ]),
         (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['JSON-BUFFER'] ]),
         (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
@@ -580,46 +579,6 @@ def remove_ids(buffer):
                   os.path.join(buffer, '.'.join(file.split('.')[:-2]) + '.' + file.split('.')[-1]))
 
 ### \Remove IDs ###
-
-
-### Duplicate check ###
-
-# Check for duplicates
-def duplicate_check(level):
-    if level == 0 or RULES['MODE'] != 'merge':
-        return
-
-    # Get the list of songs in the buffer
-    buffer_songs = os.listdir(RULES['BUFFER'])
-    # Get the list of songs in the output directory
-    output_songs = set(os.listdir(RULES['DIR']))
-
-    # Get the list of songs that are in both the buffer and the output
-    duplicates = [s for s in buffer_songs if s in output_songs]
-
-    match level:
-        case 1: # Delete the duplicates from the buffer
-            for file in duplicates:
-                os.remove(os.path.join(RULES['BUFFER'], file))
-        case 2: # Delete the duplicates from the existing directory
-            for file in duplicates:
-                os.remove(os.path.join(RULES['DIR'], file))
-        case 3: # Manual review
-            if len(duplicates) == 0:
-                return
-
-            with open('duplicates.txt', 'w') as f:
-                f.write('\n'.join(duplicates))
-            print(f'{len(duplicates)} duplicates found.\n')
-            if len(duplicates) < 15:
-                print('Duplicates:')
-                print('\n'.join(duplicates))
-
-            print('Duplicates written to duplicates.txt')
-            print('Please remove the duplicates and run again.')
-            exit(4)
-
-### \Duplicate check ###
 
 
 ### Rename ###

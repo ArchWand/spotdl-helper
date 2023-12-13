@@ -80,11 +80,10 @@ RENAME=[
 # 2: Skip over manual replacing to downloading JSON metadata for verification
 # 3: Skip downloading JSON to verifying songs
 # 4: Skip verifying songs to removing the spotify ids
-# 5: Skip removing the spotify ids to checking for duplicates
-# 6: Skip checking for duplicates to renaming files
-# 7: Skip renaming files to combining and removing buffers
-# 8: Skip combining and removing buffers to normalizing with mp3gain
-# 9: Do nothing
+# 5: Skip removing the spotify ids to renaming files
+# 6: Skip renaming files to combining and removing buffers
+# 7: Skip combining and removing buffers to normalizing with mp3gain
+# 8: Do nothing
 # SKIP=0
 
 # The buffer used to store downloaded songs before moving into DIR
