@@ -14,7 +14,7 @@ RULES = {
     'OUTPUT-FORMAT': '{title} - {artists}',
     'URL': '',
     'DIR': './songs',
-    'MP3GAIN': True,
+    'MP3GAIN': False,
     'IGNORE-MISMATCH': [],
     'REPLACE': [],
     'RENAME': [],
@@ -34,18 +34,12 @@ SPOTIFY_TRACK_URL_PREFIX = 'https://open.spotify.com/track/'
 
 TAKES_BOOL = set(['MP3GAIN'])
 TAKES_INT = set(['DUP-SCAN-LEVEL', 'VERIFY-LEVEL', 'VERIFY-IGNORE-MISSING-URL', 'SKIP'])
-TAKES_FILE = set(['NEW', 'OLD'])
-
-# Rule : set([ Mode to create and ensure empty ])
-TAKES_DIR = {
-    'DIR' : set(['new']),
-    'MANUAL-BUFFER' : set(['merge', 'new']),
-    'BUFFER' : set(['merge', 'new']),
-}
+TAKES_FILE = set(['DIFF-NEW', 'DIFF-OLD'])
+TAKES_DIR = set(['DIR', 'MANUAL-BUFFER', 'BUFFER', 'JSON-BUFFER'])
 
 # Rule : set([options])
 TAKES_STR = {
-    'MODE': set(['merge', 'new']),
+    'MODE': set(['diff', 'new']),
     'SKIP_TO': '',
 }
 
@@ -190,10 +184,8 @@ def directory_check(rule, setting):
         return f'Error: {rule} must be a directory name.\n'
     if not os.path.isdir(setting):
         # Make the directory if it doesn't exist
-        if RULES['MODE'] in TAKES_DIR[rule]:
-            os.makedirs(setting)
-        else:
-            return f'Error: "{setting}" not found for {rule}.\n'
+        os.makedirs(setting)
+        print(f'Making directory: {setting}')
     # Make sure the directory is empty
     if len(os.listdir(setting)) > 0:
         return f'Error: "{setting}" is not empty.\n'

@@ -1,6 +1,5 @@
 # Options: merge, new
 # new: Creates a new directory containing the downloaded playlist
-# merge: Merges a new playlist download with already downloaded songs
 MODE=new
 
 # Format for the file names; syntax is that of spotdl (`spotdl -h | grep -A 10 -- --output`)
@@ -9,12 +8,11 @@ MODE=new
 # The url of the new playlist. The playlist must be public
 URL=
 
-# The directory to put the songs in. For MODE=merge, this
-# is the directory that contains songs already
+# The directory to put the songs in.
 DIR=./songs
 
 # Whether or not to use mp3gain
-# MP3GAIN=True
+MP3GAIN=True
 
 # Comma separated list of spotify urls where we should ignore
 # differences in the title and artist from the title and artist
