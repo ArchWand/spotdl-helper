@@ -1,4 +1,5 @@
 from yt_dlp import YoutubeDL
+import pandas as pd
 import simplejson as json
 import subprocess
 import sys
@@ -12,6 +13,9 @@ CWD = os.getcwd()
 RULES = {
     'MODE': 'new',
     'OUTPUT-FORMAT': '{title} - {artists}',
+    'DIFF-MODE': 'new',
+    'DIFF-NEW': '',
+    'DIFF-OLD': '',
     'URL': '',
     'DIR': './songs',
     'MP3GAIN': False,
@@ -62,6 +66,10 @@ def main():
 
     parser(filename, RULES)
 
+    if RULES['MODE'] == 'diff':
+        diff(RULES['DIFF-MODE'], RULES['DIFF-NEW'], RULES['DIFF-OLD'])
+        return
+
     # [ (func, [ params ]), ]
     funcs = [
         (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
@@ -95,6 +103,54 @@ def spotdl(dir, *args):
     os.chdir(CWD)
 
 ### \Helper ###
+
+
+### Diff ###
+
+def diff(mode, new, old):
+    new = pd.read_csv(new)
+    old = pd.read_csv(old)
+
+    # Extract IDs
+    new_ids = set(new['Spotify ID'])
+    old_ids = set(old['Spotify ID'])
+
+    # Find the diff
+    match mode:
+        case 'new':
+            diff = new_ids - old_ids
+        case 'old':
+            diff = old_ids - new_ids
+        case 'diff':
+            diff = new_ids ^ old_ids
+        case 'common':
+            diff = new_ids & old_ids
+        case _:
+            print(f'Invalid diff mode: {mode}')
+            exit(3)
+
+    print('Spotify ID,Title,Artist,Album,URL')
+    for id in diff:
+        if mode == 'new':
+            row = new[new['Spotify ID'] == id]
+        elif mode == 'old':
+            row = old[old['Spotify ID'] == id]
+        elif mode == 'diff':
+            row = new[new['Spotify ID'] == id]
+            if len(row) == 0:
+                row = old[old['Spotify ID'] == id]
+        elif mode == 'common':
+            row = new[new['Spotify ID'] == id]
+            if len(row) == 0:
+                row = old[old['Spotify ID'] == id]
+        else:
+            print(f'Invalid diff mode: {mode}')
+            exit(3)
+
+        row = row.iloc[0]
+        print(f'{row["Spotify ID"]},{row["Title"]},{row["Artist"]},{row["Album"]},{row["URL"]}')
+
+### \Diff ###
 
 
 ### Parsing ###

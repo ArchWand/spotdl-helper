@@ -1,7 +1,17 @@
 # Options: merge, new
 # new: Creates a new directory containing the downloaded playlist
+# diff: Takes two csvs from Exportify and compares them. Overrides all other functions.
 MODE=new
 
+# Use Exportify to get csvs for two playlists, and put their names as DIFF-NEW and DIFF-OLD
+# Options:
+# new: Prints a list of the songs in DIFF-NEW but not in DIFF-OLD
+# old: Prints a list of the songs in DIFF-OLD but not in DIFF-NEW
+# diff: Prints the list of both DIFF-MODE=new and DIFF-MODE=old
+# common: Prints the list of songs in both DIFF-NEW and DIFF-OLD
+# DIFF-MODE=new
+# DIFF-NEW=
+# DIFF-OLD=
 # Format for the file names; syntax is that of spotdl (`spotdl -h | grep -A 10 -- --output`)
 # OUTPUT-FORMAT={title} - {artists}
 
