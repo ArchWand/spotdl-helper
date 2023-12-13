@@ -1,3 +1,4 @@
+from functools import lru_cache
 from yt_dlp import YoutubeDL
 import simplejson as json
 import pandas as pd
@@ -30,6 +31,7 @@ RULES = {
     # Skip options to resume an interrupted download
     'SKIP': 0,
     'BUFFER': './.tmp_dlbuf',
+    'JSON-BUFFER': './.tmp_json',
 }
 
 SPOTIFY_TRACK_URL_PREFIX = 'https://open.spotify.com/track/'
@@ -77,11 +79,12 @@ def main():
     funcs = [
         (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
         (manual_relace_songs, [ RULES['REPLACE'] ]),
+        (download_metadata, [ RULES['JSON-BUFFER'] ]),
         (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
         (remove_ids, [ RULES['BUFFER'] ]),
         (duplicate_check, [ RULES['DUP-SCAN-LEVEL'] ]),
         (rename, [ RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['RENAME'] ]),
-        (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'] ]),
+        (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['JSON-BUFFER'] ]),
         (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
     ]
 
@@ -104,6 +107,40 @@ def spotdl(dir, *args):
         print('Error: spotdl not found. Is spotdl installed?')
         exit(1)
     os.chdir(CWD)
+
+# Get the metadata of the songs in the buffer using ffprobe
+# { filename: (title, artist, album, url)}
+@lru_cache(maxsize=1)
+def get_ffprobe_data():
+    metadata = {}
+
+    # Download the metadata of the songs in the buffer
+    ffprobe_cmd = ['ffprobe', '-v', '0', '-show_entries', 'format']
+    
+    for file in os.listdir(RULES['BUFFER']):
+        title = ''
+        artist = ''
+        album = ''
+        url = ''
+
+        result = subprocess.run(ffprobe_cmd + [os.path.join(RULES['BUFFER'], file)], capture_output=True, text=True)
+        if result.returncode != 0:
+            print(result.stderr)
+            exit(5)
+
+        for line in result.stdout.split('\n'):
+            if line.startswith('TAG:title='):
+                title = line.split('TAG:title=')[1]
+            elif line.startswith('TAG:artist='):
+                artist = line.split('TAG:artist=')[1]
+            elif line.startswith('TAG:album='):
+                album = line.split('TAG:album=')[1]
+            elif line.startswith('TAG:comment=https://'):
+                url = line.split('TAG:comment=')[1]
+
+        metadata[file] = (title, artist, album, url)
+
+    return metadata
 
 ### \Helper ###
 
@@ -321,6 +358,53 @@ def replace_songs(spotids):
 ### \Manual replace songs ###
 
 
+### Download metadata ###
+
+# Use yt-dlp to download the metadata of the songs in the buffer
+def download_metadata(json_buffer):
+    # { filename: (title, artist, album, url)}
+    metadata = get_ffprobe_data()
+    fileurls = { file: data[3] for file, data in metadata.items() }
+
+    with YoutubeDL() as ydl:
+        i = 1
+        for filename, url in fileurls.items():
+            if url == '': handle_missing_url(filename)
+            print(f'Downloading metadata for ({i}/{len(fileurls)})')
+            i += 1
+
+            # write to file
+            with open(os.path.join(json_buffer, filename + '.json'), 'w') as f:
+                f.write(json.dumps(ydl.sanitize_info(
+                    ydl.extract_info(url, download=False))))
+
+def handle_missing_url(filename):
+    match RULES['VERIFY-IGNORE-MISSING-URL']:
+        case 0: # Error on missing url
+            print(f'Error: {filename} has no url data.')
+            print('Consider copying the output of spotdl to a text file for viewing.')
+            exit(1)
+        case 1: # Skip over missing url
+            pass
+        case 2: # Allow manual skipping of missing url
+            print(f'Error: {filename} has no url data.')
+            print('Please enter a url for the song.')
+            url = input('Url: ')
+            if url == '':
+                print('WARNING: No url entered. Skipping song.')
+        case 3: # (default) Ask for user input on missing url
+            print(f'Error: {filename} has no url.')
+            print('Please enter a url for the song.')
+            url = input('Url: ')
+            if url == '':
+                print('Error: No url entered.')
+                exit(1)
+        case _:
+            print(f'Error: Invalid value for VERIFY-IGNORE-MISSING-URL: {RULES["VERIFY-IGNORE-MISSING-URL"]}')
+
+### \Download metadata ###
+
+
 ### Verification ###
 
 # Verify that the correct songs were downloaded
@@ -333,12 +417,12 @@ def verify(level, ignore_mismatch):
     # { filename: (title, artist, album, url)}
     metadata = get_ffprobe_data()
     # { filename: (title, creator, channel, album)}
-    yt_metadata = get_yt_data({ file: data[3] for file, data in metadata.items() })
+    yt_metadata = get_yt_data()
 
     # Make sure that title and artist match
     verification_queue = []
-    for file, data, _, yt_data in zip(metadata.keys(), metadata.values(), yt_metadata.keys(), yt_metadata.values()):
-        if queue_for_verification(level, file, data, yt_data, ignore_mismatch):
+    for file, data in zip(metadata.keys(), metadata.values()):
+        if queue_for_verification(level, file, data, yt_metadata[file], ignore_mismatch):
             verification_queue.append(file)
 
     # Prompt the user to verify the songs
@@ -372,100 +456,34 @@ def verify(level, ignore_mismatch):
 
     replace_songs(new_yt_urls)
 
-# Get the metadata of the songs in the buffer using ffprobe
-def get_ffprobe_data():
+# Get the metadata of the songs in the buffer from the downloaded json
+# { filename: (title, creator, channel, album)}
+def get_yt_data():
     metadata = {}
 
-    # Download the metadata of the songs in the buffer
-    ffprobe_cmd = ['ffprobe', '-v', '0', '-show_entries', 'format']
-    
-    for file in os.listdir(RULES['BUFFER']):
-        title = ''
-        artist = ''
-        album = ''
-        url = ''
-
-        result = subprocess.run(ffprobe_cmd + [os.path.join(RULES['BUFFER'], file)], capture_output=True, text=True)
-        if result.returncode != 0:
-            print(result.stderr)
-            exit(5)
-
-        for line in result.stdout.split('\n'):
-            if line.startswith('TAG:title='):
-                title = line.split('TAG:title=')[1]
-            elif line.startswith('TAG:artist='):
-                artist = line.split('TAG:artist=')[1]
-            elif line.startswith('TAG:album='):
-                album = line.split('TAG:album=')[1]
-            elif line.startswith('TAG:comment=https://'):
-                url = line.split('TAG:comment=')[1]
-
-        metadata[file] = (title, artist, album, url)
-
-    return metadata
-
-# Get the metadata of the songs in the buffer using yt-dlp
-def get_yt_data(fileurls):
-    metadata = {}
-
-    with YoutubeDL() as ydl:
-        i = 1
-        for filename, url in fileurls.items():
-            if url == '':
-                match RULES['VERIFY-IGNORE-MISSING-URL']:
-                    case 0: # Error on missing url
-                        print(f'Error: {filename} has no url data.')
-                        print('Consider copying the output of spotdl to a text file for viewing.')
-                        exit(1)
-                    case 1: # Skip over missing url
-                        continue
-                    case 2: # Allow manual skipping of missing url
-                        print(f'Error: {filename} has no url data.')
-                        print('Please enter a url for the song.')
-                        url = input('Url: ')
-                        if url == '':
-                            print('WARNING: No url entered. Skipping song.')
-                            continue
-                    case 3: # (default) Ask for user input on missing url
-                        print(f'Error: {filename} has no url.')
-                        print('Please enter a url for the song.')
-                        url = input('Url: ')
-                        if url == '':
-                            print('Error: No url entered.')
-                            exit(1)
-                    case _:
-                        print(f'Error: Invalid value for VERIFY-IGNORE-MISSING-URL: {RULES["VERIFY-IGNORE-MISSING-URL"]}')
-
-            print(f'Extracting metadata for ({i}/{len(fileurls)})')
-            i += 1
-            data = json.loads(json.dumps(ydl.sanitize_info(
-                ydl.extract_info(url, download=False))))
-
+    # extract metadata
+    for file in os.listdir(RULES['JSON-BUFFER']):
+        if not file.endswith('.json'): continue
+        with open(os.path.join(RULES['JSON-BUFFER'], file), 'r') as f:
+            data = json.load(f)
             title, creator, channel, album = '', '', '', ''
-            try:
+            if 'title' in data:
                 title = data['title']
-            except KeyError:
-                pass
-            try:
+            if 'creator' in data:
                 creator = data['creator']
-            except KeyError:
-                pass
-            try:
+            if 'channel' in data:
                 channel = data['channel']
-            except KeyError:
-                pass
-            try:
+            if 'album' in data:
                 album = data['album']
-            except KeyError:
-                pass
 
+            filename = '.'.join(file.split('.')[:-1])
             metadata[filename] = (title, creator, channel, album)
 
     return metadata
 
 # Check if the file should be queued for verification
 def queue_for_verification(level, file, metadata, yt_metadata, ignore_mismatch):
-    if file.split('.')[-2] in ignore_mismatch:
+    if '.'.join(file.split('.')[:-2]) in ignore_mismatch:
         return False
 
     title, artist, album, url = metadata
@@ -690,7 +708,7 @@ def rename_prompt(file):
 ### Combine and clean ###
 
 # Combine the directories and remove the buffers
-def combine_and_clean(dir, buffer, manual_buffer):
+def combine_and_clean(dir, buffer, manual_buffer, json_buffer):
     os.chdir(CWD)
 
     # Move everything to dir
@@ -704,6 +722,13 @@ def combine_and_clean(dir, buffer, manual_buffer):
         os.rmdir(buffer)
     if dir != manual_buffer:
         os.rmdir(manual_buffer)
+
+    # Remove all json metadata
+    for file in os.listdir(json_buffer):
+        if file.endswith('.json'):
+            os.remove(f'{json_buffer}/{file}')
+    if dir != json_buffer:
+        os.rmdir(json_buffer)
 
     os.chdir(CWD)
 
