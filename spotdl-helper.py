@@ -1,6 +1,6 @@
 from yt_dlp import YoutubeDL
-import pandas as pd
 import simplejson as json
+import pandas as pd
 import subprocess
 import sys
 import os
@@ -71,6 +71,8 @@ def main():
         diff(RULES['DIFF-MODE'], RULES['DIFF-NEW'], RULES['DIFF-OLD'])
         return
 
+    # Note that because all function arguments are set immediately after parsing,
+    # modifying RULES will not affect the function calls
     # [ (func, [ params ]), ]
     funcs = [
         (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
