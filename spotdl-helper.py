@@ -19,7 +19,7 @@ RULES = {
     'DIFF-OLD': '',
     'URL': '',
     'DIR': './songs',
-    'MP3GAIN': False,
+    'MP3GAIN': True,
     'IGNORE-MISMATCH': [],
     'REPLACE': [],
     'RENAME': [],
@@ -240,7 +240,8 @@ def parser(filename, rules):
 
     for rule, setting in rules.items():
         if rule in TAKES_FILE:
-            errors += file_check(rule, setting)
+            if rules['MODE'] == 'diff':
+                errors += file_check(rule, setting)
         elif rule in TAKES_DIR:
             errors += directory_check(rule, setting)
         elif rule in TAKES_BOOL:
