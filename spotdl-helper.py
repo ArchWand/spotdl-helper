@@ -139,84 +139,7 @@ def spotdl(dir, *args):
         exit(1)
     os.chdir(CWD)
 
-# Get the metadata of the songs in the buffer using ffprobe
-# { filename: (title, artist, album, url)}
-@lru_cache(maxsize=1)
-def get_ffprobe_data():
-    metadata = {}
-
-    # Download the metadata of the songs in the buffer
-    ffprobe_cmd = ['ffprobe', '-v', '0', '-show_entries', 'format']
-    
-    for file in os.listdir(RULES['BUFFER']):
-        title = ''
-        artist = ''
-        album = ''
-        url = ''
-
-        result = subprocess.run(ffprobe_cmd + [os.path.join(RULES['BUFFER'], file)], capture_output=True, text=True)
-        if result.returncode != 0:
-            print(result.stderr)
-            exit(5)
-
-        for line in result.stdout.split('\n'):
-            if line.startswith('TAG:title='):
-                title = line.split('TAG:title=')[1]
-            elif line.startswith('TAG:artist='):
-                artist = line.split('TAG:artist=')[1]
-            elif line.startswith('TAG:album='):
-                album = line.split('TAG:album=')[1]
-            elif line.startswith('TAG:comment=https://'):
-                url = line.split('TAG:comment=')[1]
-
-        metadata[file] = (title, artist, album, url)
-
-    return metadata
-
 ### \Helper ###
-
-
-### Diff ###
-
-def diff(mode, new, old):
-    new = pd.read_csv(new)
-    old = pd.read_csv(old)
-
-    # Extract IDs
-    new_ids = set(new['Spotify ID'])
-    old_ids = set(old['Spotify ID'])
-
-    # Find the diff
-    match mode:
-        case 'new': diff = new_ids - old_ids
-        case 'old': diff = old_ids - new_ids
-        case 'diff': diff = new_ids ^ old_ids
-        case 'common': diff = new_ids & old_ids
-        case _:
-            print(f'Invalid diff mode: {mode}')
-            exit(3)
-
-    print('Spotify ID,Title,Artist,Album,URL')
-    for id in diff:
-        new_row = new.loc[new['Spotify ID'] == id]
-        old_row = old.loc[old['Spotify ID'] == id]
-        match mode:
-            case 'new': row = new_row
-            case 'old': row = old_row
-            case 'diff': row = new_row if len(new_row) > 0 else old_row
-            case 'common':
-                if not new_row.equals(old_row):
-                    print(f'Error: {id} has different data in new and old.')
-                    exit(2)
-                row = new_row
-            case _:
-                print(f'Invalid diff mode: {mode}')
-                exit(3)
-
-        row = row.iloc[0]
-        print(f'{row["Spotify ID"]}, {row["Track Name"]}, {row["Artist Name(s)"]}, {row["Album Name"]}')
-
-### \Diff ###
 
 
 ### Parsing ###
@@ -415,6 +338,40 @@ def download_metadata(json_buffer):
             with open(os.path.join(json_buffer, filename + '.json'), 'w') as f:
                 f.write(json.dumps(ydl.sanitize_info(
                     ydl.extract_info(url, download=False))))
+
+# Get the metadata of the songs in the buffer using ffprobe
+# { filename: (title, artist, album, url)}
+@lru_cache(maxsize=1)
+def get_ffprobe_data():
+    metadata = {}
+
+    # Download the metadata of the songs in the buffer
+    ffprobe_cmd = ['ffprobe', '-v', '0', '-show_entries', 'format']
+    
+    for file in os.listdir(RULES['BUFFER']):
+        title = ''
+        artist = ''
+        album = ''
+        url = ''
+
+        result = subprocess.run(ffprobe_cmd + [os.path.join(RULES['BUFFER'], file)], capture_output=True, text=True)
+        if result.returncode != 0:
+            print(result.stderr)
+            exit(5)
+
+        for line in result.stdout.split('\n'):
+            if line.startswith('TAG:title='):
+                title = line.split('TAG:title=')[1]
+            elif line.startswith('TAG:artist='):
+                artist = line.split('TAG:artist=')[1]
+            elif line.startswith('TAG:album='):
+                album = line.split('TAG:album=')[1]
+            elif line.startswith('TAG:comment=https://'):
+                url = line.split('TAG:comment=')[1]
+
+        metadata[file] = (title, artist, album, url)
+
+    return metadata
 
 def handle_missing_url(filename):
     match RULES['VERIFY-IGNORE-MISSING-URL']:
@@ -746,6 +703,49 @@ def mp3gain(yes, dir):
     os.chdir(CWD)
 
 ### \MP3GAIN ###
+
+
+### Diff ###
+
+def diff(mode, new, old):
+    new = pd.read_csv(new)
+    old = pd.read_csv(old)
+
+    # Extract IDs
+    new_ids = set(new['Spotify ID'])
+    old_ids = set(old['Spotify ID'])
+
+    # Find the diff
+    match mode:
+        case 'new': diff = new_ids - old_ids
+        case 'old': diff = old_ids - new_ids
+        case 'diff': diff = new_ids ^ old_ids
+        case 'common': diff = new_ids & old_ids
+        case _:
+            print(f'Invalid diff mode: {mode}')
+            exit(3)
+
+    print('Spotify ID,Title,Artist,Album,URL')
+    for id in diff:
+        new_row = new.loc[new['Spotify ID'] == id]
+        old_row = old.loc[old['Spotify ID'] == id]
+        match mode:
+            case 'new': row = new_row
+            case 'old': row = old_row
+            case 'diff': row = new_row if len(new_row) > 0 else old_row
+            case 'common':
+                if not new_row.equals(old_row):
+                    print(f'Error: {id} has different data in new and old.')
+                    exit(2)
+                row = new_row
+            case _:
+                print(f'Invalid diff mode: {mode}')
+                exit(3)
+
+        row = row.iloc[0]
+        print(f'{row["Spotify ID"]}, {row["Track Name"]}, {row["Artist Name(s)"]}, {row["Album Name"]}')
+
+### \Diff ###
 
 
 if __name__ == '__main__':
