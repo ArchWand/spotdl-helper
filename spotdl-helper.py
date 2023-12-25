@@ -41,10 +41,17 @@ DELIMITER = '%,,'
 
 ## Rule types ##
 
+# Note that rules are mutually exlusive; any rule should only fall under one category
 TAKES_BOOL = set(['MP3GAIN'])
 TAKES_INT = set(['DUP-SCAN-LEVEL', 'VERIFY-LEVEL', 'VERIFY-IGNORE-MISSING-URL', 'SKIP'])
-TAKES_FILE = set(['DIFF-NEW', 'DIFF-OLD'])
-TAKES_DIR = set(['DIR', 'MANUAL-BUFFER', 'BUFFER', 'JSON-BUFFER'])
+TAKES_FILE = {
+    'new': [],
+    'diff': ['DIFF-NEW', 'DIFF-OLD']
+}
+TAKES_DIR = {
+    'new': ['DIR', 'MANUAL-BUFFER', 'BUFFER', 'JSON-BUFFER'],
+    'diff': [],
+}
 
 # Rule : set([options])
 TAKES_STR = {
@@ -165,10 +172,9 @@ def parser(filename, rules):
         rules[rule] = setting
 
     for rule, setting in rules.items():
-        if rule in TAKES_FILE:
-            if rules['MODE'] == 'diff':
-                errors += file_check(rule, setting)
-        elif rule in TAKES_DIR:
+        if rule in TAKES_FILE[rules['MODE']]:
+            errors += file_check(rule, setting)
+        elif rule in TAKES_DIR[rules['MODE']]:
             errors += directory_check(rule, setting)
         elif rule in TAKES_BOOL:
             e = bool_check(rule, setting)
@@ -277,7 +283,7 @@ def array_check(rule, setting):
     for s in setting:
         # Use the lambda in TAKES_ARRAY to check if the string is valid
         if not TAKES_ARRAY[rule][0](s):
-            return f'Error: {rule} {TAKES_ARRAY[rule][1]}.\n'
+            return f'Error: {rule} {TAKES_ARRAY[rule][1]}.\nFailed on: {s}\n'
     return ''
 
 ### \Parsing ###
