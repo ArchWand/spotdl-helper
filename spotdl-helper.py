@@ -36,6 +36,9 @@ RULES = {
 
 SPOTIFY_TRACK_URL_PREFIX = 'https://open.spotify.com/track/'
 
+# Delimiter used for parsing. Change this value to avoid conflicts
+DELIMITER = '%,,'
+
 ## Rule types ##
 
 TAKES_BOOL = set(['MP3GAIN'])
@@ -211,10 +214,15 @@ def get_setting(i, line, rules_file, errors=''):
             errors += f'Error: Missing closing bracket. (line {i+1})\n'
             return rule, '', errors, rules_file
 
+        # Replace the last comma on each line with special delimiter
+        rules_file[i:j+1] = [ s.rsplit(',', 1)[0] + DELIMITER for s in rules_file[i:j+1] ]
+
         setting += ' '.join(['', *rules_file[i+1:j+1]])
-        rules_file[i:j+1] = [''] * (j-i+1) # Remove the lines we just processed
-        setting = setting.replace('[', '').replace(']', '').split(',')
+        setting = setting.replace('[', '').replace(']', '').split(DELIMITER)
         setting = [s.strip() for s in setting if s.strip() != '']
+
+        # Remove the lines we just processed
+        rules_file[i:j+1] = [''] * (j-i+1)
 
     return rule, setting, errors, rules_file
 
