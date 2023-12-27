@@ -24,7 +24,6 @@ RULES = {
     'REPLACE': [],
     'RENAME': [],
     'MANUAL-BUFFER': './.tmp_manual',
-    'DUP-SCAN-LEVEL': 3,
     'VERIFY-LEVEL': 6,
     'VERIFY-IGNORE-MISSING-URL': 3,
 
@@ -43,7 +42,7 @@ DELIMITER = '%,,'
 
 # Note that rules are mutually exlusive; any rule should only fall under one category
 TAKES_BOOL = set(['MP3GAIN'])
-TAKES_INT = set(['DUP-SCAN-LEVEL', 'VERIFY-LEVEL', 'VERIFY-IGNORE-MISSING-URL', 'SKIP'])
+TAKES_INT = set(['VERIFY-LEVEL', 'VERIFY-IGNORE-MISSING-URL', 'SKIP'])
 TAKES_FILE = {
     'new': [],
     'diff': ['DIFF-NEW', 'DIFF-OLD']
