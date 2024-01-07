@@ -724,8 +724,8 @@ def diff(mode, new, old):
     old = pd.read_csv(old)
 
     # Extract IDs
-    new_ids = set(new['Spotify ID'])
-    old_ids = set(old['Spotify ID'])
+    new_ids = set(new['Track URI'])
+    old_ids = set(old['Track URI'])
 
     # Find the diff
     match mode:
@@ -739,23 +739,19 @@ def diff(mode, new, old):
 
     print('Spotify ID,Title,Artist,Album,URL')
     for id in diff:
-        new_row = new.loc[new['Spotify ID'] == id]
-        old_row = old.loc[old['Spotify ID'] == id]
+        new_row = new.loc[new['Track URI'] == id]
+        old_row = old.loc[old['Track URI'] == id]
         match mode:
             case 'new': row = new_row
             case 'old': row = old_row
             case 'diff': row = new_row if len(new_row) > 0 else old_row
-            case 'common':
-                if not new_row.equals(old_row):
-                    print(f'Error: {id} has different data in new and old.')
-                    exit(2)
-                row = new_row
+            case 'common': row = new_row
             case _:
                 print(f'Invalid diff mode: {mode}')
                 exit(3)
 
         row = row.iloc[0]
-        print(f'{row["Spotify ID"]}, {row["Track Name"]}, {row["Artist Name(s)"]}, {row["Album Name"]}')
+        print(f'{row["Track URI"]}, {row["Track Name"]}, {row["Artist Name(s)"]}, {row["Album Name"]}')
 
 ### \Diff ###
 
