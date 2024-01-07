@@ -550,6 +550,7 @@ def verification_prompt(queue, metadata, yt_metadata, ignore_mismatch):
                 break
             elif response == 'n':
                 while True:
+                    print(f'Search for {title} - {artist} on YouTube: https://www.youtube.com/results?search_query={title.replace(" ", "+")}+{artist.replace(" ", "+")}')
                     url = input('Enter a correct URL: ')
                     if url.startswith('https://') and 'youtu' in url:
                         if len(file.split('.')) < 3:
