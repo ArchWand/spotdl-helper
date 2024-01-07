@@ -247,13 +247,12 @@ def directory_check(rule, setting):
     # Make sure the directory is empty
     if len(os.listdir(setting)) > 0:
         # If skip is non-zero, prompt to proceed
-        if RULES['SKIP'] > 0:
+        if int(RULES['SKIP']) > 0:
             print(f'Warning: {setting} is not empty.')
             print('Press enter to continue...')
             input()
         else:
             return f'Error: {setting} is not empty.\n'
-        return f'Error: "{setting}" is not empty.\n'
     return ''
 
 def bool_check(rule, setting):
