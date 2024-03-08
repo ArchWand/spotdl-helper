@@ -78,27 +78,27 @@ def main():
 
     parser(filename, RULES)
 
+    if RULES['MODE'] == 'new':
+        # Note that because all function arguments are set immediately after parsing,
+        # modifying RULES will not affect the function calls
+        # [ (func, [ params ]), ]
+        funcs = [
+            (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
+            (manual_relace_songs, [ RULES['REPLACE'] ]),
+            (download_metadata, [ RULES['JSON-BUFFER'] ]),
+            (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
+            (remove_ids, [ RULES['BUFFER'] ]),
+            (rename, [ RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['RENAME'] ]),
+            (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['JSON-BUFFER'] ]),
+            (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
+        ]
+
+        # Executes the functions in func
+        # Done this way to implement SKIP
+        list(map(lambda z: z[0](*z[1]), funcs[RULES['SKIP']:]))
+
     if RULES['MODE'] == 'diff':
-        diff(RULES['DIFF-MODE'], RULES['DIFF-NEW'], RULES['DIFF-OLD'])
-        return
-
-    # Note that because all function arguments are set immediately after parsing,
-    # modifying RULES will not affect the function calls
-    # [ (func, [ params ]), ]
-    funcs = [
-        (download_songs, [ RULES['URL'], RULES['BUFFER'] ]),
-        (manual_relace_songs, [ RULES['REPLACE'] ]),
-        (download_metadata, [ RULES['JSON-BUFFER'] ]),
-        (verify, [ RULES['VERIFY-LEVEL'], RULES['IGNORE-MISMATCH'] ]),
-        (remove_ids, [ RULES['BUFFER'] ]),
-        (rename, [ RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['RENAME'] ]),
-        (combine_and_clean, [ RULES['DIR'], RULES['BUFFER'], RULES['MANUAL-BUFFER'], RULES['JSON-BUFFER'] ]),
-        (mp3gain, [ RULES['MP3GAIN'], RULES['DIR'] ]),
-    ]
-
-    # Executes the functions in func
-    # Done this way to implement SKIP
-    list(map(lambda z: z[0](*z[1]), funcs[RULES['SKIP']:]))
+        diff(RULES['DIFF-MODE'], RULES['DIFF-NEW'], RULES['DIFF-OLD'], RULES['DIFF-LEVEL'])
 
 ### \Main ###
 
