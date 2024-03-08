@@ -13,11 +13,11 @@ CWD = os.getcwd()
 
 RULES = {
     'MODE': 'new',
-    'OUTPUT-FORMAT': '{title} - {artists}',
+    'URL': '',
     'DIFF-MODE': 'new',
     'DIFF-NEW': '',
     'DIFF-OLD': '',
-    'URL': '',
+    'OUTPUT-FORMAT': '{title} - {artists}',
     'DIR': './songs',
     'MP3GAIN': True,
     'IGNORE-MISMATCH': [],
