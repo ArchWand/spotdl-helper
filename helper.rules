@@ -21,7 +21,7 @@ URL=
 # 2: Match title, artist, and album
 # 3: Match title and artist
 # 4: Match title
-DIFF-LEVEL=3
+# DIFF-LEVEL=3
 
 # Format for the file names; syntax is that of spotdl (`spotdl -h | grep -A 10 -- --output`)
 # OUTPUT-FORMAT={title} - {artists}
