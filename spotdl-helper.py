@@ -17,6 +17,7 @@ RULES = {
     'DIFF-MODE': 'new',
     'DIFF-NEW': '',
     'DIFF-OLD': '',
+    'DIFF-LEVEL': 3,
     'OUTPUT-FORMAT': '{title} - {artists}',
     'DIR': './songs',
     'MP3GAIN': True,
@@ -42,7 +43,7 @@ DELIMITER = '%,,'
 
 # Note that rules are mutually exlusive; any rule should only fall under one category
 TAKES_BOOL = set(['MP3GAIN'])
-TAKES_INT = set(['VERIFY-LEVEL', 'VERIFY-IGNORE-MISSING-URL', 'SKIP'])
+TAKES_INT = set(['DIFF-LEVEL', 'VERIFY-LEVEL', 'VERIFY-IGNORE-MISSING-URL', 'SKIP'])
 TAKES_FILE = {
     'new': [],
     'diff': ['DIFF-NEW', 'DIFF-OLD']
@@ -720,26 +721,45 @@ def mp3gain(yes, dir):
 
 ### Diff ###
 
-def diff(mode, new, old):
+def diff(mode, new, old, level):
     new = pd.read_csv(new)
     old = pd.read_csv(old)
 
-    # Extract IDs
-    new_ids = set(new['Track URI'])
-    old_ids = set(old['Track URI'])
+    # Decide what to use to find the diff
+    match level:
+        case 1: diff_cond = ('Track URI',)
+        case 2: diff_cond = ('Track Name', 'Artist Name(s)', 'Album Name')
+        case 3: diff_cond = ('Track Name', 'Artist Name(s)')
+        case 4: diff_cond = ('Track Name',)
+        case _: diff_cond = ('Track URI',)
+
+    # Keep track of spotify ids to later match up with the diff
+    new_map = { tuple(row): new['Track URI'][i] for i, row in
+               enumerate(new[[*diff_cond]].itertuples(index=False, name=None)) }
+    old_map = { tuple(row): old['Track URI'][i] for i, row in
+               enumerate(old[[*diff_cond]].itertuples(index=False, name=None)) }
+    # Note that [[*diff_cond]].itertuples needs to be copy-pasted later.
+    # This is because the dict comprehension uses up the iterator.
+
+    # Grab the data needed
+    new_diff = set(new[[*diff_cond]].itertuples(index=False, name=None))
+    old_diff = set(old[[*diff_cond]].itertuples(index=False, name=None))
 
     # Find the diff
     match mode:
-        case 'new': diff = new_ids - old_ids
-        case 'old': diff = old_ids - new_ids
-        case 'diff': diff = new_ids ^ old_ids
-        case 'common': diff = new_ids & old_ids
+        case 'new': diff = new_diff - old_diff
+        case 'old': diff = old_diff - new_diff
+        case 'diff': diff = new_diff ^ old_diff
+        case 'common': diff = new_diff & old_diff
         case _:
             print(f'Invalid diff mode: {mode}')
             exit(3)
 
-    print('Spotify ID,Title,Artist,Album,URL')
-    for id in diff:
+    # Convert to a list of ids
+    diff_ids = [ new_map[row] if row in new_map else old_map[row] for row in diff ]
+
+    print('Spotify ID,Title,Artist,Album')
+    for id in diff_ids:
         new_row = new.loc[new['Track URI'] == id]
         old_row = old.loc[old['Track URI'] == id]
         match mode:
