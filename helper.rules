@@ -3,6 +3,9 @@
 # diff: Takes two csvs from Exportify and compares them. Overrides all other functions.
 MODE=new
 
+# The url of the new playlist. The playlist must be public
+URL=
+
 # Use Exportify to get csvs for two playlists, and put their names as DIFF-NEW and DIFF-OLD
 # Options:
 # new: Prints a list of the songs in DIFF-NEW but not in DIFF-OLD
@@ -15,9 +18,6 @@ MODE=new
 
 # Format for the file names; syntax is that of spotdl (`spotdl -h | grep -A 10 -- --output`)
 # OUTPUT-FORMAT={title} - {artists}
-
-# The url of the new playlist. The playlist must be public
-URL=
 
 # The directory to put the songs in.
 DIR=./songs
