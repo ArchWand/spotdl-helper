@@ -1,6 +1,6 @@
 # Options: new, diff
 # new: Creates a new directory containing the downloaded playlist
-# diff: Takes two csvs from Exportify and compares them. Overrides all other functions.
+# diff: Takes two csvs from Exportify and compares them
 MODE=new
 
 # The url of the new playlist. The playlist must be public
