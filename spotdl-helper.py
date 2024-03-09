@@ -46,16 +46,19 @@ TAKES_BOOL = set(['MP3GAIN'])
 TAKES_INT = set(['DIFF-LEVEL', 'VERIFY-LEVEL', 'VERIFY-IGNORE-MISSING-URL', 'SKIP'])
 TAKES_FILE = {
     'new': [],
-    'diff': ['DIFF-NEW', 'DIFF-OLD']
+    'diff': ['DIFF-NEW', 'DIFF-OLD'],
 }
+# Mode : ([rules], when to warn not empty instead of error
 TAKES_DIR = {
-    'new': ['DIR', 'MANUAL-BUFFER', 'BUFFER', 'JSON-BUFFER'],
-    'diff': [],
+    'new': (['DIR', 'MANUAL-BUFFER', 'BUFFER', 'JSON-BUFFER'],
+            lambda: int(RULES['SKIP']) > 0),
+    'diff': ([],
+            lambda: False),
 }
 
 # Rule : set([options])
 TAKES_STR = {
-    'MODE': set(['diff', 'new']),
+    'MODE': set(['new', 'diff']),
     'DIFF-MODE': set(['new', 'old', 'diff', 'common']),
     'SKIP_TO': '',
 }
@@ -174,7 +177,7 @@ def parser(filename, rules):
     for rule, setting in rules.items():
         if rule in TAKES_FILE[rules['MODE']]:
             errors += file_check(rule, setting)
-        elif rule in TAKES_DIR[rules['MODE']]:
+        elif rule in TAKES_DIR[rules['MODE']][0]:
             errors += directory_check(rule, setting)
         elif rule in TAKES_BOOL:
             e = bool_check(rule, setting)
@@ -248,7 +251,7 @@ def directory_check(rule, setting):
     # Make sure the directory is empty
     if len(os.listdir(setting)) > 0:
         # If skip is non-zero, prompt to proceed
-        if int(RULES['SKIP']) > 0:
+        if TAKES_DIR[RULES['MODE']][1]():
             print(f'Warning: {setting} is not empty.')
             print('Press enter to continue...')
             input()
@@ -383,6 +386,7 @@ def get_ffprobe_data():
                 url = line.split('TAG:comment=')[1]
 
         metadata[file] = (title, artist, album, url)
+        print(f'{file}: {title} - {artist} - {album} - {url}')
 
     return metadata
 
