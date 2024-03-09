@@ -346,7 +346,7 @@ def download_metadata(json_buffer):
     with YoutubeDL() as ydl:
         i = 1
         for filename, url in fileurls.items():
-            if url == '': handle_missing_url(filename)
+            if url == '': url = handle_missing_url(filename)
             print(f'Downloading metadata for ({i}/{len(fileurls)})')
             i += 1
 
@@ -391,6 +391,7 @@ def get_ffprobe_data():
     return metadata
 
 def handle_missing_url(filename):
+    url = ''
     match RULES['VERIFY-IGNORE-MISSING-URL']:
         case 0: # Error on missing url
             print(f'Error: {filename} has no url data.')
@@ -413,6 +414,7 @@ def handle_missing_url(filename):
                 exit(1)
         case _:
             print(f'Error: Invalid value for VERIFY-IGNORE-MISSING-URL: {RULES["VERIFY-IGNORE-MISSING-URL"]}')
+    return url
 
 ### \Download metadata ###
 
